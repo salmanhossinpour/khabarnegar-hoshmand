@@ -1,0 +1,166 @@
+import { NewsPost, PresetTemplate } from '../types';
+
+export const PRESET_TEMPLATES: PresetTemplate[] = [
+  {
+    id: 'breaking-alert',
+    name: 'خبر فوری (Breaking)',
+    description: 'نوار بولد قرمز/زرد با نشانگر زنده و تضاد نوری ماکزیمم',
+    badge: 'فوری و زنده',
+    previewGradient: 'from-red-600 to-amber-600',
+    defaultPrimaryColor: '#ef4444',
+  },
+  {
+    id: 'editorial-minimal',
+    name: 'ژورنالی مینیمال',
+    description: 'طراحی فاخر سبک روزنامه‌ها و مجلات مدرن با خطوط دقیق',
+    badge: 'تحلیلی و رسمی',
+    previewGradient: 'from-zinc-800 to-zinc-950',
+    defaultPrimaryColor: '#38bdf8',
+  },
+  {
+    id: 'dark-glass',
+    name: 'تاریک شیشه‌ای (Glass)',
+    description: 'کارت بلر شده نیمه‌شفاف با نور ملایم و پس‌زمینه عمیق',
+    badge: 'مدرن و ترند',
+    previewGradient: 'from-cyan-900 to-blue-950',
+    defaultPrimaryColor: '#06b6d4',
+  },
+  {
+    id: 'social-feed',
+    name: 'سوشال فید اینستاگرام',
+    description: 'کادر مدرن شبکه اجتماعی همراه با بج دسته‌بندی و نقل‌قول',
+    badge: 'اینستاگرامی',
+    previewGradient: 'from-violet-600 to-indigo-900',
+    defaultPrimaryColor: '#8b5cf6',
+  },
+  {
+    id: 'broadcast-tv',
+    name: 'پخش زنده تلویزیونی',
+    description: 'زیرنویس استودیو خبر با ساعت، منبع و بار خبری',
+    badge: 'استودیو خبر',
+    previewGradient: 'from-blue-700 to-slate-900',
+    defaultPrimaryColor: '#2563eb',
+  },
+  {
+    id: 'quote-statement',
+    name: 'نقل‌قول و بیانیه',
+    description: 'فوکوس ویژه روی سخنان اشخاص با گیومه بزرگ و عنوان',
+    badge: 'نقل‌قول طلایی',
+    previewGradient: 'from-amber-600 to-stone-900',
+    defaultPrimaryColor: '#f59e0b',
+  },
+  {
+    id: 'split-photo',
+    name: 'اسپلیت (عکس + متن)',
+    description: 'ترکیب ۵۰/۵۰ تصویر شاخص و باکس متنی تفکیک‌شده',
+    badge: 'تصویرمحور',
+    previewGradient: 'from-emerald-700 to-teal-950',
+    defaultPrimaryColor: '#10b981',
+  },
+  {
+    id: 'headline-hero',
+    name: 'تیتر اول هایماپکت',
+    description: 'تایپوگرافی بزرگ و خوانایی ۱۰۰٪ مناسب استوری‌های فوری',
+    badge: 'تیتر سنگین',
+    previewGradient: 'from-rose-700 to-zinc-900',
+    defaultPrimaryColor: '#f43f5e',
+  },
+  {
+    id: 'key-takeaways',
+    name: 'اینفو ۳ نکته مهم',
+    description: 'نمایش فشرده خبر در قالب ۳ باکس شماره‌دار منظم',
+    badge: 'خلاصه فشرده',
+    previewGradient: 'from-teal-600 to-slate-900',
+    defaultPrimaryColor: '#14b8a6',
+  },
+];
+
+export const SAMPLE_BACKGROUND_IMAGES = [
+  {
+    id: 'tech',
+    title: 'فناوری و هوش مصنوعی',
+    url: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80',
+  },
+  {
+    id: 'economy',
+    title: 'اقتصاد و بازار مالی',
+    url: 'https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&q=80',
+  },
+  {
+    id: 'politics',
+    title: 'رویداد رسمی و کنفرانس',
+    url: 'https://images.unsplash.com/photo-1540910419892-4a36d2c3266c?auto=format&fit=crop&w=1200&q=80',
+  },
+  {
+    id: 'sports',
+    title: 'ورزش و استادیوم',
+    url: 'https://images.unsplash.com/photo-1508098682722-e99c43a406b2?auto=format&fit=crop&w=1200&q=80',
+  },
+  {
+    id: 'city',
+    title: 'شهر و جامعه',
+    url: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
+  },
+  {
+    id: 'dark-abstract',
+    title: 'گرادینت تیره انتزاعی',
+    url: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=1200&q=80',
+  },
+];
+
+export const INITIAL_NEWS_POST: NewsPost = {
+  id: 'news_init_1',
+  title: 'رونمایی از نسل جدید موتورهای هوش مصنوعی با قابلیت تحلیل زنده اطلاعات',
+  kicker: 'تحولات دنیای فناوری',
+  lead: 'متخصصان در تازه‌ترین کنفرانس جهانی فناوری از پلتفرم جدیدی رونمایی کردند که سرعت پردازش و تحلیل داده‌های کلان را تا ۳ برابر ارتقا داده و استانداردهای تازه‌ای را در صنعت نرم‌افزار رقم می‌زند.',
+  keyPoints: [
+    'کاهش ۶۰ درصدی مصرف انرژی در دیتاسنترها',
+    'پشتیبانی بومی از زبان فارسی و پردازش چندزبانه',
+    'امکان ادغام لحظه‌ای با سیستم‌های ابری و سازمانی'
+  ],
+  quote: {
+    text: 'این دستاورد مرزهای پردازش ابری را جابه‌جا کرده و فرصت‌های بی‌سابقه‌ای برای توسعه‌دهندگان می‌آفریند.',
+    author: 'دکتر علیرضا رضایی',
+    role: 'سرپرست تیم تحقیق و توسعه'
+  },
+  category: 'فناوری',
+  source: 'خبرگزاری فناوری',
+  date: 'امروز - ۱۴:۴۵',
+  readTime: '۲ دقیقه مطالعه',
+  aspectRatio: '1:1',
+  templateId: 'breaking-alert',
+  bgImage: SAMPLE_BACKGROUND_IMAGES[0].url,
+  bgOverlayColor: '#09090b',
+  bgOverlayOpacity: 75,
+  bgBlur: 0,
+  fontFamily: 'vazir',
+  titleSize: 'lg',
+  primaryColor: '#ef4444',
+  accentColor: '#fbbf24',
+  textColor: '#ffffff',
+  showWatermark: true,
+  watermarkText: '@KhabarOnline_Fa',
+  badgeStyle: 'solid',
+  agencyLogo: 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&w=200&h=200&q=80',
+  agencyName: 'خبرگزاری آنلاین',
+  agencyPosition: 'top-left',
+  agencyBadgeShape: 'pill',
+  agencyLogoSize: 'md',
+  showAgencyLogo: true,
+  showAgencyName: true,
+  createdAt: Date.now(),
+  updatedAt: Date.now(),
+};
+
+export const COLOR_PALETTES = [
+  { name: 'قرمز خبری', color: '#ef4444' },
+  { name: 'آبی درخشان', color: '#3b82f6' },
+  { name: 'زمردی مینیمال', color: '#10b981' },
+  { name: 'طلایی لوکس', color: '#f59e0b' },
+  { name: 'بنفش سایبری', color: '#8b5cf6' },
+  { name: 'رز قرمز', color: '#f43f5e' },
+  { name: 'فیروزه‌ای', color: '#06b6d4' },
+  { name: 'نارنجی پرانرژی', color: '#f97316' },
+  { name: 'سفید خالص', color: '#ffffff' },
+  { name: 'مشکی کربن', color: '#171717' },
+];
