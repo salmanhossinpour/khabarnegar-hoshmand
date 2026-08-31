@@ -5,6 +5,10 @@
     "": {
       "name": "react-example",
       "dependencies": {
+        "@fontsource/lalezar": "^5.3.0",
+        "@fontsource/noto-naskh-arabic": "^5.3.0",
+        "@fontsource/rubik": "^5.3.0",
+        "@fontsource/vazirmatn": "^5.3.0",
         "@google/genai": "^2.4.0",
         "@seald-io/nedb": "^4.1.2",
         "@tailwindcss/vite": "^4.1.14",
@@ -124,6 +128,14 @@
     "@esbuild/win32-ia32": ["@esbuild/win32-ia32@0.25.12", "", { "os": "win32", "cpu": "ia32" }, "sha512-HkqnmmBoCbCwxUKKNPBixiWDGCpQGVsrQfJoVGYLPT41XWF8lHuE5N6WhVia2n4o5QK5M4tYr21827fNhi4byQ=="],
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.25.12", "", { "os": "win32", "cpu": "x64" }, "sha512-alJC0uCZpTFrSL0CCDjcgleBXPnCrEAhTBILpeAp7M/OFgoqtAetfBzX0xM00MUsVVPpVjlPuMbREqnZCXaTnA=="],
+
+    "@fontsource/lalezar": ["@fontsource/lalezar@5.3.0", "", {}, "sha512-ptwEfWP7OlucVaRHpuMo6tfvw9xDcBEoaiIvzSDUb7z5pih+DZIRKLarulkJunVR+DnQ5VaJVjuVVOwrqiq7Cw=="],
+
+    "@fontsource/noto-naskh-arabic": ["@fontsource/noto-naskh-arabic@5.3.0", "", {}, "sha512-S/GDgQ6mh/PKo4mz5+eXNYbEarvpI7yh6eCdOz8tTVbeM7+OUiacIEscaYEibr/+egDtGbO2ZB00sjy1bJC1kQ=="],
+
+    "@fontsource/rubik": ["@fontsource/rubik@5.3.0", "", {}, "sha512-Nks2mn7vlE1jZVHuVgoKU2Ejqjvd+GJzLRdraCjo1xc79oo7O6vJ8pcvSfmKPGX3/Ln7nt09XWFzPeu2jWf0xQ=="],
+
+    "@fontsource/vazirmatn": ["@fontsource/vazirmatn@5.3.0", "", {}, "sha512-XC/2yN2r5gwhFT3klSuWaqncODX2DOfRYfNmbyzgtWYxHxMC+tcoaX+tgggrm6hSkEgpR1TuSDEf1PiI91G7qg=="],
 
     "@google/genai": ["@google/genai@2.18.0", "", { "dependencies": { "google-auth-library": "^10.3.0", "p-retry": "^4.6.2", "protobufjs": "^7.5.4", "ws": "^8.18.0" }, "peerDependencies": { "@modelcontextprotocol/sdk": "^1.25.2" }, "optionalPeers": ["@modelcontextprotocol/sdk"] }, "sha512-uy9gWVTAZXuA/2tld0QJl/QNiGEn4QOmfX4PiRgZQmeFQRQhojpD/Gf41SPnBJmjEnT83a+h4AdU1HHYaYvVDw=="],
 

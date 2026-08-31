@@ -53,6 +53,22 @@ export const NewsCanvas = forwardRef<HTMLDivElement, NewsCanvasProps>(
       }
     };
 
+    const getFontFamilyStyle = () => {
+      switch (post.fontFamily) {
+        case 'lalezar':
+          return "'Lalezar', 'Vazirmatn', cursive, Tahoma, sans-serif";
+        case 'rubik':
+          return "'Rubik', 'Vazirmatn', Tahoma, sans-serif";
+        case 'naskh':
+          return "'Noto Naskh Arabic', 'Vazirmatn', Tahoma, serif";
+        case 'system':
+          return "system-ui, -apple-system, BlinkMacSystemFont, Tahoma, sans-serif";
+        case 'vazir':
+        default:
+          return "'Vazirmatn', 'Shabnam', Tahoma, sans-serif";
+      }
+    };
+
     const getTitleSizeClass = () => {
       switch (post.titleSize) {
         case 'sm':
@@ -85,6 +101,7 @@ export const NewsCanvas = forwardRef<HTMLDivElement, NewsCanvasProps>(
             height: `${height}px`,
             transform: `scale(${scale})`,
             transformOrigin: 'top right',
+            fontFamily: getFontFamilyStyle(),
           }}
         >
           {/* Background Image Layer */}

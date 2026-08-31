@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { NewsPost, AspectRatioType } from '../types';
 import { cleanText } from '../utils/textCleaner';
-import { exportElementToImage } from '../utils/imageExporter';
+import { exportElementToImage, renderNewsCardToNativeCanvas } from '../utils/imageExporter';
 
 interface ExportModalProps {
   post: NewsPost;
@@ -87,27 +87,47 @@ export const ExportModal: React.FC<ExportModalProps> = ({
     } catch (e) {}
   };
 
-  const handleDownloadImage = async () => {
-    if (!canvasRef.current) {
-      alert('المان تصویر یافت نشد.');
-      return;
-    }
+  const handleDownloadImage = async (forceOffline = false) => {
     setDownloading(true);
     setErrorMessage(null);
     setStatusMessage('در حال آماده‌سازی و رندر خروجی با ابعاد دقیق...');
 
     try {
-      const node = canvasRef.current;
+      let dataUrl: string;
 
-      const dataUrl = await exportElementToImage(node, {
-        baseWidth,
-        baseHeight,
-        outputWidth,
-        outputHeight,
-        pixelRatio,
-        format,
-        quality: format === 'jpeg' ? 0.96 : 1,
-      });
+      if (forceOffline || !canvasRef.current) {
+        // Direct Native 2D Canvas Export (100% Offline)
+        dataUrl = await renderNewsCardToNativeCanvas(
+          post,
+          outputWidth,
+          outputHeight,
+          format,
+          format === 'jpeg' ? 0.96 : 1
+        );
+      } else {
+        try {
+          const node = canvasRef.current;
+          dataUrl = await exportElementToImage(node, {
+            post,
+            baseWidth,
+            baseHeight,
+            outputWidth,
+            outputHeight,
+            pixelRatio,
+            format,
+            quality: format === 'jpeg' ? 0.96 : 1,
+          });
+        } catch (domErr) {
+          console.warn('[ExportModal] Standard DOM export failed, using instant native offline canvas fallback...', domErr);
+          dataUrl = await renderNewsCardToNativeCanvas(
+            post,
+            outputWidth,
+            outputHeight,
+            format,
+            format === 'jpeg' ? 0.96 : 1
+          );
+        }
+      }
 
       const link = document.createElement('a');
       const categorySlug = (post.category || 'news').replace(/[\s/]+/g, '_');
@@ -125,7 +145,19 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       setTimeout(() => setStatusMessage(null), 4000);
     } catch (err: any) {
       console.error('Export error:', err);
-      setErrorMessage(err?.message || 'خطا در دریافت تصویر. لطفاً مجدداً امتحان فرمایید.');
+      // Even if everything failed, try one final synchronous fallback
+      try {
+        const emergencyDataUrl = await renderNewsCardToNativeCanvas(post, outputWidth, outputHeight, format);
+        const link = document.createElement('a');
+        link.download = `news_${outputWidth}x${outputHeight}_${Date.now()}.${format}`;
+        link.href = emergencyDataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setStatusMessage('تصویر به صورت آفلاین با موفقیت دانلود شد.');
+      } catch (finalErr: any) {
+        setErrorMessage('خطا در ایجاد خروجی. لطفاً دوباره تلاش نمایید.');
+      }
     } finally {
       setDownloading(false);
     }
@@ -334,24 +366,37 @@ ${post.watermarkText ? `🆔 ${cleanText(post.watermarkText)}` : ''}
         </div>
 
         {/* Main Action Download */}
-        <button
-          type="button"
-          onClick={handleDownloadImage}
-          disabled={downloading}
-          className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-sm shadow-xl shadow-red-950/50 flex items-center justify-center gap-2 transition-all active:scale-[0.99] disabled:opacity-50"
-        >
-          {downloading ? (
-            <>
-              <RefreshCw className="w-5 h-5 animate-spin" />
-              <span>در حال پردازش و تولید فایل با سایز {outputWidth}×{outputHeight}...</span>
-            </>
-          ) : (
-            <>
-              <Download className="w-5 h-5" />
-              <span>دانلود فوری تصویر ({outputWidth}×{outputHeight} • {format.toUpperCase()})</span>
-            </>
-          )}
-        </button>
+        <div className="space-y-2">
+          <button
+            type="button"
+            onClick={() => handleDownloadImage(false)}
+            disabled={downloading}
+            className="w-full py-4 rounded-2xl bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-sm shadow-xl shadow-red-950/50 flex items-center justify-center gap-2 transition-all active:scale-[0.99] disabled:opacity-50"
+          >
+            {downloading ? (
+              <>
+                <RefreshCw className="w-5 h-5 animate-spin" />
+                <span>در حال پردازش و تولید فایل با سایز {outputWidth}×{outputHeight}...</span>
+              </>
+            ) : (
+              <>
+                <Download className="w-5 h-5" />
+                <span>دانلود استاندارد تصویر ({outputWidth}×{outputHeight} • {format.toUpperCase()})</span>
+              </>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleDownloadImage(true)}
+            disabled={downloading}
+            className="w-full py-2.5 px-4 rounded-xl bg-neutral-950 hover:bg-neutral-800 border border-neutral-800 hover:border-neutral-700 text-neutral-300 hover:text-white text-xs font-semibold flex items-center justify-center gap-2 transition-all"
+            title="تولید تصویر با موتور مستقل و بدون وابستگی به اینترنت یا سرور"
+          >
+            <Sparkles className="w-4 h-4 text-emerald-400" />
+            <span>دانلود مستقیم با موتور آفلاین (100% مستقل و بدون نیاز به اینترنت)</span>
+          </button>
+        </div>
 
         {/* Secondary Actions */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-neutral-800">
