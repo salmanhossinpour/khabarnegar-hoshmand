@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { toPng, toJpeg } from 'html-to-image';
 import confetti from 'canvas-confetti';
 import { 
   Download, 
@@ -17,10 +16,12 @@ import {
   Monitor,
   Maximize2,
   Layers,
-  Sliders
+  Sliders,
+  AlertCircle
 } from 'lucide-react';
 import { NewsPost, AspectRatioType } from '../types';
 import { cleanText } from '../utils/textCleaner';
+import { exportElementToImage } from '../utils/imageExporter';
 
 interface ExportModalProps {
   post: NewsPost;
@@ -45,6 +46,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   const [format, setFormat] = useState<'png' | 'jpeg'>('png');
   const [quality, setQuality] = useState<QualityLevel>('standard');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
@@ -91,40 +93,21 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       return;
     }
     setDownloading(true);
-    setStatusMessage('در حال رندر ابعاد دقیق خروجی...');
+    setErrorMessage(null);
+    setStatusMessage('در حال آماده‌سازی و رندر خروجی با ابعاد دقیق...');
 
     try {
       const node = canvasRef.current;
 
-      // Ensure web fonts and images are ready
-      await document.fonts?.ready;
-
-      const options = {
-        width: baseWidth,
-        height: baseHeight,
-        canvasWidth: outputWidth,
-        canvasHeight: outputHeight,
-        pixelRatio: pixelRatio,
+      const dataUrl = await exportElementToImage(node, {
+        baseWidth,
+        baseHeight,
+        outputWidth,
+        outputHeight,
+        pixelRatio,
+        format,
         quality: format === 'jpeg' ? 0.96 : 1,
-        style: {
-          transform: 'none',
-          transformOrigin: 'top left',
-          margin: '0',
-          padding: '0',
-          top: '0',
-          left: '0',
-          right: 'auto',
-          bottom: 'auto',
-          position: 'static',
-          width: `${baseWidth}px`,
-          height: `${baseHeight}px`,
-        },
-        cacheBust: false,
-      };
-
-      const dataUrl = format === 'png' 
-        ? await toPng(node, options)
-        : await toJpeg(node, options);
+      });
 
       const link = document.createElement('a');
       const categorySlug = (post.category || 'news').replace(/[\s/]+/g, '_');
@@ -137,12 +120,12 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       link.click();
       document.body.removeChild(link);
 
-      setStatusMessage(`فایل تصویر با سایز ${outputWidth} × ${outputHeight} دانلود شد!`);
+      setStatusMessage(`فایل تصویر با سایز ${outputWidth} × ${outputHeight} پیکسل دانلود شد!`);
       triggerConfetti();
-      setTimeout(() => setStatusMessage(null), 3000);
+      setTimeout(() => setStatusMessage(null), 4000);
     } catch (err: any) {
       console.error('Export error:', err);
-      alert('خطا در دریافت تصویر. لطفاً مجدداً امتحان کنید: ' + (err?.message || ''));
+      setErrorMessage(err?.message || 'خطا در دریافت تصویر. لطفاً مجدداً امتحان فرمایید.');
     } finally {
       setDownloading(false);
     }
@@ -210,6 +193,14 @@ ${post.watermarkText ? `🆔 ${cleanText(post.watermarkText)}` : ''}
           <div className="p-3 rounded-2xl bg-emerald-500/20 border border-emerald-500/50 text-emerald-400 text-xs font-bold flex items-center gap-2 animate-fadeIn">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>{statusMessage}</span>
+          </div>
+        )}
+
+        {/* Error notification */}
+        {errorMessage && (
+          <div className="p-3 rounded-2xl bg-rose-500/20 border border-rose-500/50 text-rose-300 text-xs font-bold flex items-center gap-2 animate-fadeIn">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <span>{errorMessage}</span>
           </div>
         )}
 

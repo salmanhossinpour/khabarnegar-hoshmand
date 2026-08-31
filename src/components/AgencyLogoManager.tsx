@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AgencyBrand, NewsPost, LogoBadgeShapeType, LogoPositionType, LogoSizeType } from '../types';
+import { getSafeImageUrl } from '../utils/imageExporter';
 import { 
   Building2, 
   Upload, 
@@ -370,17 +371,18 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-neutral-300">موقعیت قرارگیری در تصویر:</label>
+              <label className="text-xs font-semibold text-neutral-300">موقعیت قرارگیری در تصویر (بدون تداخل با متن):</label>
               <select
                 value={formPosition}
                 onChange={(e) => setFormPosition(e.target.value as LogoPositionType)}
                 className="w-full p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-100"
               >
-                <option value="top-left">بالا سمت چپ (استاندارد)</option>
-                <option value="top-right">بالا سمت راست</option>
-                <option value="top-center">بالا وسط</option>
-                <option value="bottom-left">پایین سمت چپ</option>
-                <option value="bottom-right">پایین سمت راست</option>
+                <option value="top-left">بالا چپ (هدر اختصاصی و بدون تداخل)</option>
+                <option value="top-right">بالا راست (هدر اختصاصی و بدون تداخل)</option>
+                <option value="top-center">بالا وسط (سربرگ رسمی)</option>
+                <option value="header-bar">نوار سربرگ سراسری (Header Bar یکدست)</option>
+                <option value="bottom-left">پایین چپ (در فوتر بدون تداخل)</option>
+                <option value="bottom-right">پایین راست (در فوتر بدون تداخل)</option>
               </select>
             </div>
           </div>
@@ -447,9 +449,10 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
                   <div className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-xl bg-black/40 border border-white/10 p-1 flex items-center justify-center shrink-0 overflow-hidden shadow-inner">
                       <img
-                        src={agency.logoUrl}
+                        src={getSafeImageUrl(agency.logoUrl)}
                         alt={agency.name}
                         className="w-full h-full object-contain"
+                        crossOrigin="anonymous"
                       />
                     </div>
                     <div className="space-y-0.5">
@@ -538,11 +541,13 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold text-neutral-400">محل قرارگیری:</label>
-            <div className="grid grid-cols-2 gap-1.5">
+            <label className="text-[11px] font-semibold text-neutral-400">محل قرارگیری (تفکیک‌شده و بدون تداخل متنی):</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
               {[
                 { id: 'top-left' as LogoPositionType, label: 'بالا چپ' },
                 { id: 'top-right' as LogoPositionType, label: 'بالا راست' },
+                { id: 'top-center' as LogoPositionType, label: 'بالا وسط' },
+                { id: 'header-bar' as LogoPositionType, label: 'نوار سربرگ' },
                 { id: 'bottom-left' as LogoPositionType, label: 'پایین چپ' },
                 { id: 'bottom-right' as LogoPositionType, label: 'پایین راست' },
               ].map((pos) => (
@@ -552,7 +557,7 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
                   onClick={() => onUpdatePost({ agencyPosition: pos.id })}
                   className={`p-2 rounded-xl text-xs font-semibold border transition-all ${
                     (post.agencyPosition || 'top-left') === pos.id
-                      ? 'bg-blue-500/20 border-blue-500 text-blue-400'
+                      ? 'bg-blue-500/20 border-blue-500 text-blue-400 font-bold'
                       : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-200'
                   }`}
                 >
@@ -564,11 +569,12 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
 
           <div className="space-y-1.5">
             <label className="text-[11px] font-semibold text-neutral-400">اندازه لوگو:</label>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-4 gap-1.5">
               {[
                 { id: 'sm' as LogoSizeType, label: 'کوچک' },
                 { id: 'md' as LogoSizeType, label: 'متوسط' },
                 { id: 'lg' as LogoSizeType, label: 'بزرگ' },
+                { id: 'xl' as LogoSizeType, label: 'خیلی بزرگ' },
               ].map((sz) => (
                 <button
                   key={sz.id}
@@ -576,7 +582,7 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
                   onClick={() => onUpdatePost({ agencyLogoSize: sz.id })}
                   className={`p-2 rounded-xl text-xs font-semibold border transition-all ${
                     (post.agencyLogoSize || 'md') === sz.id
-                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
+                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 font-bold'
                       : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-neutral-200'
                   }`}
                 >

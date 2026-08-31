@@ -44,11 +44,11 @@ const MISTRAL_MODELS = [
 
 const OPENROUTER_QUICK_MODELS = [
   { id: 'meta-llama/llama-3.3-70b-instruct', label: 'Llama 3.3 70B', badge: 'متا' },
-  { id: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet', badge: 'آنتروپیک' },
-  { id: 'deepseek/deepseek-r1', label: 'DeepSeek R1', badge: 'استدلالی' },
-  { id: 'openai/gpt-4o', label: 'GPT-4o', badge: 'اوپن‌ای‌آی' },
-  { id: 'qwen/qwen-2.5-72b-instruct', label: 'Qwen 2.5 72B', badge: 'کیوون' },
+  { id: 'deepseek/deepseek-chat', label: 'DeepSeek Chat', badge: 'عالی' },
   { id: 'google/gemini-2.0-flash-001', label: 'Gemini 2.0 Flash', badge: 'گوگل' },
+  { id: 'openai/gpt-4o-mini', label: 'GPT-4o Mini', badge: 'سریع' },
+  { id: 'mistralai/mistral-small-24b-instruct-2501', label: 'Mistral Small 24B', badge: 'میسترال' },
+  { id: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet', badge: 'آنتروپیک' },
 ];
 
 export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, onClose }) => {
@@ -74,6 +74,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
   // State
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
   const [headlineOptions, setHeadlineOptions] = useState<string[]>([]);
   const [loadingHeadlines, setLoadingHeadlines] = useState(false);
   const [copiedArticle, setCopiedArticle] = useState(false);
@@ -149,6 +150,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
 
     setLoading(true);
     setError(null);
+    setFallbackNotice(null);
     setHeadlineOptions([]);
 
     try {
@@ -173,6 +175,10 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
       const json = await res.json();
       if (!json.success) {
         throw new Error(json.error || 'خطا در پردازش هوش مصنوعی');
+      }
+
+      if (json.fallbackNotice) {
+        setFallbackNotice(json.fallbackNotice);
       }
 
       const data = cleanAiPayload(json.data);
@@ -636,11 +642,37 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
         </div>
       </div>
 
+      {/* Fallback Notice */}
+      {fallbackNotice && (
+        <div className="p-3 rounded-2xl bg-amber-950/60 border border-amber-800/80 text-amber-200 text-xs flex items-start gap-2.5 animate-fadeIn">
+          <Lightbulb className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="font-medium leading-relaxed">{fallbackNotice}</p>
+            <p className="text-[11px] text-amber-400/80">برای عملکرد پایدارتر می‌توانید تب «گوگل جمینای» را انتخاب نمایید.</p>
+          </div>
+        </div>
+      )}
+
       {/* Error display */}
       {error && (
-        <div className="p-3 rounded-2xl bg-red-950/60 border border-red-800/80 text-red-200 text-xs flex items-center gap-2 animate-fadeIn">
-          <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
-          <span>{error}</span>
+        <div className="p-3.5 rounded-2xl bg-red-950/70 border border-red-800/80 text-red-200 text-xs space-y-2 animate-fadeIn">
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+            <p className="leading-relaxed">{error}</p>
+          </div>
+          {provider !== 'gemini' && (
+            <button
+              type="button"
+              onClick={() => {
+                setProvider('gemini');
+                setError(null);
+              }}
+              className="w-full py-2 px-3 rounded-xl bg-red-900/60 hover:bg-red-800/80 border border-red-700/60 text-white font-bold text-xs flex items-center justify-center gap-1.5 transition-all"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+              <span>سوییچ به گوگل جمینای (بدون نیاز به کلید و ظرفیت بالا)</span>
+            </button>
+          )}
         </div>
       )}
 

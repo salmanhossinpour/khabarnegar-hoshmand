@@ -259,6 +259,43 @@ async function startServer() {
     }
   });
 
+  // CORS-Safe Image Proxy for Canvas Export
+  app.get("/api/proxy-image", async (req, res) => {
+    try {
+      const targetUrl = req.query.url as string;
+      if (!targetUrl) {
+        return res.status(400).json({ success: false, error: "URL parameter is required" });
+      }
+
+      // If it's already a data URL, return it as is or bad request
+      if (targetUrl.startsWith("data:")) {
+        return res.redirect(targetUrl);
+      }
+
+      const response = await fetch(targetUrl, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      });
+
+      if (!response.ok) {
+        return res.status(response.status).json({ success: false, error: `Failed to fetch image: ${response.statusText}` });
+      }
+
+      const contentType = response.headers.get("content-type") || "image/jpeg";
+      const buffer = Buffer.from(await response.arrayBuffer());
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      res.send(buffer);
+    } catch (err: any) {
+      console.error("Proxy image error:", err);
+      res.status(500).json({ success: false, error: err.message || "Failed to proxy image" });
+    }
+  });
+
   // NeDB: Get / Save AI Configuration & API Keys
   app.get("/api/ai/settings", async (_req, res) => {
     try {
@@ -407,7 +444,7 @@ async function startServer() {
     throw lastError;
   }
 
-  // Unified AI News Generator Endpoint (Gemini, Mistral, OpenRouter)
+  // Unified AI News Generator Endpoint (Gemini, Mistral, OpenRouter) with Smart Auto-Fallback
   app.post("/api/news/ai-generate", async (req, res) => {
     try {
       const {
@@ -477,6 +514,8 @@ ${rawText}
 - حالت نگارش انسانی و ضد هوش مصنوعی: ${humanize ? 'فعال (حداکثر طبیعی‌بودن و عدم استفاده از کلیشه‌های ماشینی)' : 'استاندارد'}`;
 
       let parsedData: any = null;
+      let providerUsed = provider;
+      let fallbackNotice: string | null = null;
 
       // 1. Mistral API Provider
       if (provider === "mistral") {
@@ -484,36 +523,43 @@ ${rawText}
         if (!mistralKey) {
           return res.status(400).json({
             success: false,
-            error: "کلید API میسترال (Mistral API Key) یافت نشد. لطفاً در بخش تنظیمات یا فیلد ورودی کلید خود را وارد کنید یا در متغیر محیطی MISTRAL_API_KEY تعریف نمایید.",
+            error: "کلید API میسترال (Mistral API Key) یافت نشد. لطفاً در بخش تنظیمات یا فیلد ورودی کلید خود را وارد کنید یا از موتور گوگل جمینای استفاده نمایید.",
           });
         }
         const mistralModel = model || savedConfig?.mistralModel || "mistral-large-latest";
 
-        const mistralResponse = await fetch("https://api.mistral.ai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${mistralKey.trim()}`,
-          },
-          body: JSON.stringify({
-            model: mistralModel,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
-            response_format: { type: "json_object" },
-            temperature: 0.65,
-          }),
-        });
+        try {
+          const mistralResponse = await fetch("https://api.mistral.ai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${mistralKey.trim()}`,
+            },
+            body: JSON.stringify({
+              model: mistralModel,
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+              response_format: { type: "json_object" },
+              temperature: 0.65,
+            }),
+          });
 
-        if (!mistralResponse.ok) {
-          const errText = await mistralResponse.text();
-          throw new Error(`خطای سرور Mistral (${mistralResponse.status}): ${errText}`);
+          if (mistralResponse.ok) {
+            const mistralJson = await mistralResponse.json();
+            const contentText = mistralJson.choices?.[0]?.message?.content || "{}";
+            parsedData = extractJson(contentText);
+          } else {
+            const errText = await mistralResponse.text();
+            console.warn(`[Mistral] Error ${mistralResponse.status}:`, errText);
+            // Fallback to Gemini
+            fallbackNotice = "به دلیل بروز محدودیت در سرور میسترال، خروجی به‌صورت خودکار با موتور جمینای تولید شد.";
+          }
+        } catch (mErr: any) {
+          console.warn("[Mistral] Request failed, falling back to Gemini:", mErr.message);
+          fallbackNotice = "به دلیل خطای ارتباط با میسترال، خروجی به‌صورت خودکار با موتور جمینای تولید شد.";
         }
-
-        const mistralJson = await mistralResponse.json();
-        const contentText = mistralJson.choices?.[0]?.message?.content || "{}";
-        parsedData = extractJson(contentText);
       }
       
       // 2. OpenRouter API Provider
@@ -522,43 +568,55 @@ ${rawText}
         if (!openrouterKey) {
           return res.status(400).json({
             success: false,
-            error: "کلید API اوپن‌روتر (OpenRouter API Key) یافت نشد. لطفاً در فیلد مربوطه یا متغیر OPENROUTER_API_KEY وارد نمایید.",
+            error: "کلید API اوپن‌روتر (OpenRouter API Key) یافت نشد. لطفاً در فیلد مربوطه وارد نمایید یا از موتور پیش‌فرض جمینای استفاده فرمایید.",
           });
         }
         const openrouterModel = model || savedConfig?.openrouterModel || "meta-llama/llama-3.3-70b-instruct";
 
-        const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${openrouterKey.trim()}`,
-            "HTTP-Referer": process.env.APP_URL || "https://ai.studio",
-            "X-Title": "AI News Card Studio",
-          },
-          body: JSON.stringify({
-            model: openrouterModel,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
-            response_format: { type: "json_object" },
-            temperature: 0.65,
-          }),
-        });
+        try {
+          const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${openrouterKey.trim()}`,
+              "HTTP-Referer": process.env.APP_URL || "https://ai.studio",
+              "X-Title": "AI News Card Studio",
+            },
+            body: JSON.stringify({
+              model: openrouterModel,
+              messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt },
+              ],
+              response_format: { type: "json_object" },
+              temperature: 0.65,
+            }),
+          });
 
-        if (!orResponse.ok) {
-          const errText = await orResponse.text();
-          throw new Error(`خطای سرور OpenRouter (${orResponse.status}): ${errText}`);
+          if (orResponse.ok) {
+            const orJson = await orResponse.json();
+            const contentText = orJson.choices?.[0]?.message?.content || "{}";
+            parsedData = extractJson(contentText);
+          } else {
+            const errBodyText = await orResponse.text();
+            let parsedErr: any = null;
+            try { parsedErr = JSON.parse(errBodyText); } catch {}
+            const errMsg = parsedErr?.error?.message || errBodyText;
+            console.warn(`[OpenRouter] Status ${orResponse.status} for model ${openrouterModel}:`, errMsg);
+
+            // Auto-fallback to Gemini when OpenRouter is rate-limited (429) or fails
+            fallbackNotice = `به دلیل محدودیت ظرفیت مدل OpenRouter (${openrouterModel})، خبر به‌صورت خودکار با موتور گوگل جمینای با موفقیت پردازش شد.`;
+          }
+        } catch (orErr: any) {
+          console.warn("[OpenRouter] Network failed, falling back to Gemini:", orErr.message);
+          fallbackNotice = "به دلیل خطای ارتباط با OpenRouter، خروجی به‌صورت هوشمند با جمینای تولید شد.";
         }
-
-        const orJson = await orResponse.json();
-        const contentText = orJson.choices?.[0]?.message?.content || "{}";
-        parsedData = extractJson(contentText);
       }
 
-      // 3. Gemini API Provider (Default)
-      else {
-        const geminiModel = model || "gemini-3.7-flash";
+      // 3. Fallback or Default Gemini Provider
+      if (!parsedData || !parsedData.title) {
+        providerUsed = "gemini";
+        const geminiModel = (provider === "gemini" && model) ? model : "gemini-3.7-flash";
         const response = await generateGeminiWithFallback(
           geminiModel,
           `${systemPrompt}\n\n${userPrompt}`,
@@ -620,13 +678,14 @@ ${rawText}
       res.json({
         success: true,
         data: cleanedData,
-        providerUsed: provider,
+        providerUsed: providerUsed,
+        fallbackNotice: fallbackNotice,
       });
     } catch (err: any) {
       console.error("AI news generate error:", err);
       let userFriendlyError = err.message || "خطایی در برقراری ارتباط با هوش مصنوعی رخ داد.";
       if (userFriendlyError.includes("503") || userFriendlyError.includes("high demand") || userFriendlyError.includes("UNAVAILABLE")) {
-        userFriendlyError = "سرورهای مدل در حال حاضر با ترافیک بالایی مواجه هستند. لطفاً لحظاتی بعد مجدداً دکمه تولید را بزنید یا از تب Mistral / OpenRouter استفاده کنید.";
+        userFriendlyError = "سرورهای هوش مصنوعی در حال حاضر با ترافیک بالایی مواجه هستند. لطفاً لحظاتی بعد مجدداً دکمه تولید را بزنید.";
       }
       res.status(500).json({
         success: false,

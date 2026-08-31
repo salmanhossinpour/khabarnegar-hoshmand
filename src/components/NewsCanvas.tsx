@@ -1,17 +1,14 @@
 import React, { forwardRef } from 'react';
 import { NewsPost } from '../types';
+import { getSafeImageUrl } from '../utils/imageExporter';
 import { 
   Flame, 
   Clock, 
-  Share2, 
   Sparkles, 
   Radio, 
-  TrendingUp, 
   CheckCircle2, 
   Quote, 
   Bookmark,
-  ShieldAlert,
-  ArrowLeft
 } from 'lucide-react';
 
 interface NewsCanvasProps {
@@ -22,12 +19,8 @@ interface NewsCanvasProps {
 }
 
 export const NewsCanvas = forwardRef<HTMLDivElement, NewsCanvasProps>(
-  ({ post, scale = 1, interactive = false, onEditField }, ref) => {
+  ({ post, scale = 1 }, ref) => {
     // Dimension definitions based on aspect ratio (fixed coordinate system for high-res export)
-    // 1:1 -> 1080x1080
-    // 9:16 -> 1080x1920
-    // 4:5 -> 1080x1350
-    // 16:9 -> 1920x1080
     const getDimensions = () => {
       switch (post.aspectRatio) {
         case '9:16':
@@ -99,7 +92,7 @@ export const NewsCanvas = forwardRef<HTMLDivElement, NewsCanvasProps>(
             <div 
               className="absolute inset-0 bg-cover bg-center transition-all duration-300"
               style={{
-                backgroundImage: `url(${post.bgImage})`,
+                backgroundImage: `url(${getSafeImageUrl(post.bgImage)})`,
                 filter: post.bgBlur > 0 ? `blur(${post.bgBlur}px)` : 'none',
                 transform: post.bgBlur > 0 ? 'scale(1.08)' : 'none',
               }}
@@ -115,7 +108,7 @@ export const NewsCanvas = forwardRef<HTMLDivElement, NewsCanvasProps>(
             }}
           />
 
-          {/* Template Specific Renderers */}
+          {/* Template Specific Renderers with Integrated, Collision-Free Branding */}
           {post.templateId === 'breaking-alert' && (
             <BreakingAlertTemplate post={post} titleClass={getTitleSizeClass()} />
           )}
@@ -151,102 +144,76 @@ export const NewsCanvas = forwardRef<HTMLDivElement, NewsCanvasProps>(
           {post.templateId === 'key-takeaways' && (
             <KeyTakeawaysTemplate post={post} titleClass={getTitleSizeClass()} />
           )}
-
-          {/* Agency Logo & Branding Overlay Layer */}
-          {post.showAgencyLogo !== false && post.agencyLogo && (
-            <AgencyLogoOverlay post={post} />
-          )}
-
-          {/* Global Watermark (if enabled and not overlapping agency logo) */}
-          {post.showWatermark && post.watermarkText && (
-            <div 
-              className={`absolute z-30 flex items-center gap-2.5 px-4 py-2 rounded-full bg-black/60 backdrop-blur-md border border-white/15 text-white text-xl font-medium tracking-wide shadow-lg ${
-                post.agencyPosition === 'top-left' ? 'bottom-8 left-8' : 'top-8 left-8'
-              }`}
-            >
-              <span 
-                className="w-2.5 h-2.5 rounded-full animate-pulse"
-                style={{ backgroundColor: post.primaryColor || '#ef4444' }} 
-              />
-              <span>{post.watermarkText}</span>
-            </div>
-          )}
         </div>
       </div>
     );
   }
 );
 
-// Agency Brand & Logo Overlay Renderer
-const AgencyLogoOverlay: React.FC<{ post: NewsPost }> = ({ post }) => {
-  const position = post.agencyPosition || 'top-left';
+// -------------------------------------------------------------
+// REUSABLE BRANDING & LOGO BADGE COMPONENT (Zero Background Text)
+// -------------------------------------------------------------
+export const AgencyBrandBadge: React.FC<{ 
+  post: NewsPost; 
+  className?: string;
+  forceCompact?: boolean;
+}> = ({ post, className = '', forceCompact = false }) => {
+  if (post.showAgencyLogo === false || !post.agencyLogo) return null;
+
   const shape = post.agencyBadgeShape || 'pill';
   const size = post.agencyLogoSize || 'md';
 
-  const getPositionClass = () => {
-    switch (position) {
-      case 'top-right':
-        return 'top-8 right-8';
-      case 'top-center':
-        return 'top-8 left-1/2 -translate-x-1/2';
-      case 'bottom-right':
-        return 'bottom-8 right-8';
-      case 'bottom-left':
-        return 'bottom-8 left-8';
-      case 'top-left':
-      default:
-        return 'top-8 left-8';
-    }
-  };
-
-  const getLogoSizeClass = () => {
+  const getSizeStyles = () => {
     switch (size) {
       case 'sm':
-        return 'w-12 h-12 text-lg';
+        return { box: 'w-10 h-10', text: 'text-lg', sub: 'text-xs' };
+      case 'xl':
+        return { box: 'w-24 h-24', text: 'text-3xl', sub: 'text-lg' };
       case 'lg':
-        return 'w-20 h-20 text-3xl';
+        return { box: 'w-20 h-20', text: 'text-2xl', sub: 'text-base' };
       case 'md':
       default:
-        return 'w-16 h-16 text-2xl';
+        return { box: 'w-14 h-14', text: 'text-xl', sub: 'text-sm' };
     }
   };
 
-  const isPill = shape === 'pill';
+  const sz = getSizeStyles();
+  const isPill = shape === 'pill' && !forceCompact;
   const isCircle = shape === 'circle';
   const isTransparent = shape === 'transparent';
 
   return (
     <div 
-      className={`absolute z-30 flex items-center gap-3 transition-all select-none ${getPositionClass()} ${
+      className={`inline-flex items-center gap-3 transition-all select-none shrink-0 ${
         isPill
-          ? 'bg-black/75 backdrop-blur-xl border border-white/20 p-2.5 pr-4 pl-4 rounded-full shadow-2xl'
+          ? 'bg-black/75 backdrop-blur-xl border border-white/20 px-3.5 py-2 rounded-full shadow-2xl'
           : isTransparent
-          ? 'p-1 filter drop-shadow-2xl'
+          ? 'p-0.5 filter drop-shadow-2xl'
           : isCircle
-          ? 'p-2 rounded-full bg-black/70 backdrop-blur-md border border-white/20 shadow-2xl'
-          : 'p-2 rounded-2xl bg-black/70 backdrop-blur-md border border-white/20 shadow-2xl'
-      }`}
+          ? 'p-1.5 rounded-full bg-black/70 backdrop-blur-md border border-white/20 shadow-2xl'
+          : 'p-1.5 rounded-2xl bg-black/70 backdrop-blur-md border border-white/20 shadow-2xl'
+      } ${className}`}
     >
       <div 
-        className={`overflow-hidden flex items-center justify-center shrink-0 ${getLogoSizeClass()} ${
+        className={`overflow-hidden flex items-center justify-center shrink-0 ${sz.box} ${
           isCircle || isPill ? 'rounded-full' : 'rounded-xl'
         }`}
       >
         <img
-          src={post.agencyLogo}
+          src={getSafeImageUrl(post.agencyLogo)}
           alt={post.agencyName || 'لوگوی خبرگزاری'}
           className="w-full h-full object-contain"
           crossOrigin="anonymous"
         />
       </div>
 
-      {post.showAgencyName !== false && post.agencyName && (
-        <div className="flex flex-col">
-          <span className="font-black text-white text-2xl drop-shadow-md leading-tight tracking-tight">
+      {post.showAgencyName !== false && post.agencyName && !forceCompact && (
+        <div className="flex flex-col text-right pr-1">
+          <span className={`font-black text-white drop-shadow-md leading-tight tracking-tight ${sz.text}`}>
             {post.agencyName}
           </span>
           {post.watermarkText && isPill && (
-            <span className="text-base text-white/70 font-mono leading-none mt-0.5">
+            <span className={`${sz.sub} text-white/70 font-mono leading-none mt-0.5`}>
               {post.watermarkText}
             </span>
           )}
@@ -256,35 +223,212 @@ const AgencyLogoOverlay: React.FC<{ post: NewsPost }> = ({ post }) => {
   );
 };
 
-// 1. Template: Breaking Alert
-const BreakingAlertTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ post, titleClass }) => (
-  <div className="relative z-10 w-full h-full flex flex-col justify-between p-12 text-white">
-    {/* Top Bar */}
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div 
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-2xl shadow-lg tracking-wider"
-          style={{ backgroundColor: post.primaryColor || '#ef4444' }}
-        >
-          <Flame className="w-7 h-7 animate-bounce" />
-          <span>خبر فوری</span>
-        </div>
-        <div className="px-4 py-2 rounded-lg bg-white/15 backdrop-blur-md text-white font-medium text-xl border border-white/10">
-          {post.category || 'عمومی'}
+// -------------------------------------------------------------
+// SMART HEADER BAR COMPONENT (Zero-Collision Layout)
+// -------------------------------------------------------------
+interface SmartHeaderProps {
+  post: NewsPost;
+  customBadge?: React.ReactNode;
+  showDate?: boolean;
+}
+
+const SmartHeader: React.FC<SmartHeaderProps> = ({ 
+  post, 
+  customBadge, 
+  showDate = true 
+}) => {
+  const hasLogo = post.showAgencyLogo !== false && !!post.agencyLogo;
+  const pos = post.agencyPosition || 'top-left';
+
+  // 1. Full-Width Header Bar Mode
+  if (hasLogo && pos === 'header-bar') {
+    return (
+      <div className="w-full bg-black/70 backdrop-blur-xl border-b border-white/15 px-8 py-4 -mx-12 -mt-12 mb-8 flex items-center justify-between shadow-2xl">
+        <AgencyBrandBadge post={post} />
+        <div className="flex items-center gap-3">
+          {customBadge || (
+            <div 
+              className="px-4 py-1.5 rounded-lg text-lg font-bold shadow"
+              style={{ backgroundColor: post.primaryColor || '#ef4444' }}
+            >
+              {post.category || 'خبر فوری'}
+            </div>
+          )}
+          {showDate && (
+            <div className="flex items-center gap-1.5 text-white/70 text-lg font-mono bg-white/10 px-3 py-1.5 rounded-lg">
+              <Clock className="w-4 h-4" />
+              <span>{post.date || 'امروز'}</span>
+            </div>
+          )}
         </div>
       </div>
-      <div className="flex items-center gap-2 text-white/80 text-xl bg-black/40 px-4 py-2 rounded-lg backdrop-blur-sm">
-        <Clock className="w-5 h-5" />
-        <span>{post.date || 'امروز'}</span>
+    );
+  }
+
+  // 2. Top-Center Mode (Centered Brand Pill with sub-row)
+  if (hasLogo && pos === 'top-center') {
+    return (
+      <div className="w-full space-y-4 mb-4">
+        <div className="flex justify-center">
+          <AgencyBrandBadge post={post} />
+        </div>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {customBadge || (
+              <div 
+                className="px-4 py-1.5 rounded-lg text-xl font-bold shadow"
+                style={{ backgroundColor: post.primaryColor || '#ef4444' }}
+              >
+                {post.category || 'خبر فوری'}
+              </div>
+            )}
+          </div>
+          {showDate && (
+            <div className="flex items-center gap-2 text-white/80 text-xl bg-black/40 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/10">
+              <Clock className="w-5 h-5" />
+              <span>{post.date || 'امروز'}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Top-Right Mode: Logo on the right, Category/Date on the left
+  if (hasLogo && pos === 'top-right') {
+    return (
+      <div className="flex items-center justify-between w-full mb-6">
+        <div className="flex items-center gap-3">
+          <AgencyBrandBadge post={post} />
+          {customBadge}
+        </div>
+        {showDate && (
+          <div className="flex items-center gap-2 text-white/80 text-xl bg-black/40 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/10">
+            <Clock className="w-5 h-5" />
+            <span>{post.date || 'امروز'}</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // 4. Top-Left Mode (Default Standard): Category/Alert on the right, Logo on the left (Zero Text Underneath!)
+  if (hasLogo && pos === 'top-left') {
+    return (
+      <div className="flex items-center justify-between w-full mb-6">
+        <div className="flex items-center gap-3">
+          {customBadge || (
+            <div 
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-2xl shadow-lg tracking-wider"
+              style={{ backgroundColor: post.primaryColor || '#ef4444' }}
+            >
+              <Flame className="w-6 h-6 animate-bounce" />
+              <span>{post.category || 'خبر فوری'}</span>
+            </div>
+          )}
+          {showDate && (
+            <div className="flex items-center gap-2 text-white/70 text-lg bg-black/40 px-3.5 py-2 rounded-xl backdrop-blur-sm border border-white/10">
+              <Clock className="w-4 h-4" />
+              <span>{post.date || 'امروز'}</span>
+            </div>
+          )}
+        </div>
+        <AgencyBrandBadge post={post} />
+      </div>
+    );
+  }
+
+  // 5. Default Header (When logo is at bottom or disabled)
+  return (
+    <div className="flex items-center justify-between w-full mb-6">
+      <div className="flex items-center gap-3">
+        {customBadge || (
+          <div 
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-2xl shadow-lg tracking-wider"
+            style={{ backgroundColor: post.primaryColor || '#ef4444' }}
+          >
+            <Flame className="w-6 h-6 animate-bounce" />
+            <span>{post.category || 'خبر فوری'}</span>
+          </div>
+        )}
+      </div>
+      {showDate && (
+        <div className="flex items-center gap-2 text-white/80 text-xl bg-black/40 px-4 py-2 rounded-xl backdrop-blur-sm border border-white/10">
+          <Clock className="w-5 h-5" />
+          <span>{post.date || 'امروز'}</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// -------------------------------------------------------------
+// SMART FOOTER BAR COMPONENT (Zero-Collision Layout)
+// -------------------------------------------------------------
+const SmartFooter: React.FC<{ post: NewsPost; extraText?: string }> = ({ post, extraText }) => {
+  const hasLogo = post.showAgencyLogo !== false && !!post.agencyLogo;
+  const isBottomLeft = hasLogo && post.agencyPosition === 'bottom-left';
+  const isBottomRight = hasLogo && post.agencyPosition === 'bottom-right';
+
+  return (
+    <div className="flex items-center justify-between pt-6 border-t border-white/15 text-xl text-white/75 mt-auto">
+      {/* Right Side */}
+      <div className="flex items-center gap-3">
+        {isBottomRight ? (
+          <AgencyBrandBadge post={post} />
+        ) : (
+          <>
+            <span className="font-semibold text-white/90">منبع:</span>
+            <span className="text-white">{post.source || 'خبرگزاری رسمی'}</span>
+            {post.watermarkText && post.showWatermark && (
+              <span className="text-white/60 font-mono text-lg bg-white/5 px-2.5 py-0.5 rounded-md">
+                {post.watermarkText}
+              </span>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Left Side */}
+      <div className="flex items-center gap-3">
+        {isBottomLeft ? (
+          <AgencyBrandBadge post={post} />
+        ) : (
+          <>
+            {extraText && <span>{extraText}</span>}
+            <span>{post.readTime || '۱ دقیقه'}</span>
+          </>
+        )}
       </div>
     </div>
+  );
+};
+
+// -------------------------------------------------------------
+// TEMPLATE 1: Breaking Alert
+// -------------------------------------------------------------
+const BreakingAlertTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ post, titleClass }) => (
+  <div className="relative z-10 w-full h-full flex flex-col justify-between p-12 text-white">
+    <SmartHeader 
+      post={post} 
+      customBadge={
+        <div 
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-2xl shadow-lg tracking-wider"
+          style={{ backgroundColor: post.primaryColor || '#ef4444' }}
+        >
+          <Flame className="w-6 h-6 animate-bounce" />
+          <span>خبر فوری</span>
+          <span className="text-white/70 font-normal text-xl pr-1.5">| {post.category || 'عمومی'}</span>
+        </div>
+      }
+    />
 
     {/* Center / Body Section */}
     <div className="my-auto space-y-6">
       {post.kicker && (
         <div 
-          className="inline-block px-4 py-1.5 rounded text-2xl font-bold tracking-wide"
-          style={{ color: post.accentColor || '#fbbf24', backgroundColor: 'rgba(0,0,0,0.6)' }}
+          className="inline-block px-4 py-1.5 rounded-lg text-2xl font-bold tracking-wide shadow-sm"
+          style={{ color: post.accentColor || '#fbbf24', backgroundColor: 'rgba(0,0,0,0.65)' }}
         >
           {post.kicker}
         </div>
@@ -292,7 +436,7 @@ const BreakingAlertTemplate: React.FC<{ post: NewsPost; titleClass: string }> = 
       <h1 className={`font-black text-white drop-shadow-md tracking-tight ${titleClass}`}>
         {post.title}
       </h1>
-      <p className="text-3xl text-neutral-200 leading-[1.6] font-normal bg-black/40 p-6 rounded-2xl border border-white/10 backdrop-blur-sm">
+      <p className="text-3xl text-neutral-200 leading-[1.6] font-normal bg-black/45 p-6 rounded-2xl border border-white/10 backdrop-blur-sm">
         {post.lead}
       </p>
 
@@ -300,7 +444,7 @@ const BreakingAlertTemplate: React.FC<{ post: NewsPost; titleClass: string }> = 
       {post.keyPoints && post.keyPoints.length > 0 && (
         <div className="space-y-3 pt-2">
           {post.keyPoints.slice(0, 3).map((point, index) => (
-            <div key={index} className="flex items-start gap-4 text-2xl text-white/90 bg-white/5 px-5 py-3 rounded-xl border border-white/5">
+            <div key={index} className="flex items-start gap-4 text-2xl text-white/90 bg-white/5 px-5 py-3 rounded-xl border border-white/5 backdrop-blur-sm">
               <span 
                 className="w-7 h-7 rounded-full flex items-center justify-center text-base font-bold shrink-0 mt-1"
                 style={{ backgroundColor: post.primaryColor || '#ef4444' }}
@@ -314,34 +458,26 @@ const BreakingAlertTemplate: React.FC<{ post: NewsPost; titleClass: string }> = 
       )}
     </div>
 
-    {/* Bottom Footer */}
-    <div className="flex items-center justify-between pt-6 border-t border-white/15 text-xl text-white/70">
-      <div className="flex items-center gap-3">
-        <span className="font-semibold text-white/90">منبع:</span>
-        <span className="text-white">{post.source || 'خبرگزاری رسمی'}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <span>{post.readTime}</span>
-      </div>
-    </div>
+    <SmartFooter post={post} />
   </div>
 );
 
-// 2. Template: Editorial Minimal
+// -------------------------------------------------------------
+// TEMPLATE 2: Editorial Minimal
+// -------------------------------------------------------------
 const EditorialTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ post, titleClass }) => (
-  <div className="relative z-10 w-full h-full flex flex-col justify-between p-14 bg-neutral-900/85 text-white border-[16px] border-neutral-800">
-    {/* Editorial Header */}
-    <div className="text-center pb-6 border-b-2 border-white/20 space-y-2">
-      <div className="flex items-center justify-between text-lg text-white/60 uppercase tracking-widest font-mono">
-        <span>{post.date || 'امروز'}</span>
-        <span className="px-3 py-1 bg-white/10 rounded font-sans text-sm text-white font-bold">{post.category}</span>
-        <span>منبع: {post.source}</span>
-      </div>
-      <div className="text-sm text-white/40 tracking-wider">گزارش ویژه و تحلیل خبری</div>
-    </div>
+  <div className="relative z-10 w-full h-full flex flex-col justify-between p-14 bg-neutral-900/90 text-white border-[16px] border-neutral-800">
+    <SmartHeader 
+      post={post}
+      customBadge={
+        <div className="flex items-center gap-2 text-base text-white/70 uppercase tracking-widest font-mono bg-white/10 px-4 py-2 rounded-xl">
+          <span className="font-bold text-white">{post.category || 'تحلیل و گزارش'}</span>
+        </div>
+      }
+    />
 
     {/* Headline & Body */}
-    <div className="my-auto space-y-8 py-6">
+    <div className="my-auto space-y-7 py-4">
       {post.kicker && (
         <div 
           className="text-2xl font-bold tracking-wider"
@@ -354,7 +490,7 @@ const EditorialTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ p
         {post.title}
       </h1>
       
-      <div className="w-24 h-1 bg-white/30" />
+      <div className="w-24 h-1.5 rounded-full" style={{ backgroundColor: post.primaryColor || '#38bdf8' }} />
 
       <p className="text-3xl text-neutral-300 leading-relaxed font-light">
         {post.lead}
@@ -362,8 +498,8 @@ const EditorialTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ p
 
       {/* Quote or Takeaway */}
       {post.quote && post.quote.text && (
-        <div className="border-r-4 pr-6 py-2 my-4 bg-white/5 rounded-l-lg border-white/40">
-          <p className="text-2xl italic text-white/90">«{post.quote.text}»</p>
+        <div className="border-r-4 pr-6 py-3 my-4 bg-white/5 rounded-l-2xl border-white/40">
+          <p className="text-2xl italic text-white/95 leading-relaxed">«{post.quote.text}»</p>
           <div className="text-xl text-white/60 mt-2 font-medium">
             — {post.quote.author} {post.quote.role && `(${post.quote.role})`}
           </div>
@@ -371,49 +507,45 @@ const EditorialTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ p
       )}
     </div>
 
-    {/* Footer */}
-    <div className="pt-6 border-t border-white/15 flex items-center justify-between text-xl text-white/50">
-      <span>استودیو خبر و رسانه</span>
-      <span>{post.readTime}</span>
-    </div>
+    <SmartFooter post={post} extraText="گزارش ویژه تحریریه" />
   </div>
 );
 
-// 3. Template: Dark Glass
+// -------------------------------------------------------------
+// TEMPLATE 3: Dark Glass
+// -------------------------------------------------------------
 const DarkGlassTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ post, titleClass }) => (
-  <div className="relative z-10 w-full h-full flex flex-col justify-end p-12">
-    {/* Glass Card Container */}
-    <div className="p-10 rounded-3xl bg-neutral-950/70 backdrop-blur-2xl border border-white/15 shadow-2xl space-y-6">
-      {/* Category Pill */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span 
-            className="px-4 py-1.5 rounded-full text-xl font-bold text-white shadow-sm flex items-center gap-2"
-            style={{ backgroundColor: post.primaryColor || '#06b6d4' }}
-          >
-            <Sparkles className="w-5 h-5" />
-            {post.category}
-          </span>
-          {post.kicker && (
-            <span className="text-xl text-white/80 font-medium bg-white/10 px-3.5 py-1 rounded-full">
-              {post.kicker}
-            </span>
-          )}
-        </div>
-        <span className="text-lg text-white/60 bg-black/40 px-3 py-1 rounded-full">{post.date}</span>
-      </div>
+  <div className="relative z-10 w-full h-full flex flex-col justify-between p-12">
+    {/* Clean Top Zone (Logo sits on open photo with zero text under it) */}
+    <SmartHeader 
+      post={post}
+      customBadge={
+        <span 
+          className="px-4 py-1.5 rounded-full text-xl font-bold text-white shadow-sm flex items-center gap-2"
+          style={{ backgroundColor: post.primaryColor || '#06b6d4' }}
+        >
+          <Sparkles className="w-5 h-5" />
+          {post.category || 'خبر مهم'}
+        </span>
+      }
+    />
 
-      {/* Title */}
+    {/* Glass Card Container at bottom half */}
+    <div className="p-10 rounded-3xl bg-neutral-950/80 backdrop-blur-2xl border border-white/15 shadow-2xl space-y-6 mt-auto">
+      {post.kicker && (
+        <div className="text-xl text-white/80 font-medium bg-white/10 px-4 py-1 rounded-full inline-block">
+          {post.kicker}
+        </div>
+      )}
+
       <h1 className={`font-black text-white tracking-tight ${titleClass}`}>
         {post.title}
       </h1>
 
-      {/* Lead */}
       <p className="text-2xl text-neutral-300 leading-relaxed font-normal">
         {post.lead}
       </p>
 
-      {/* Key Points */}
       {post.keyPoints && post.keyPoints.length > 0 && (
         <div className="grid grid-cols-1 gap-2.5 pt-2">
           {post.keyPoints.slice(0, 2).map((point, idx) => (
@@ -425,36 +557,32 @@ const DarkGlassTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ p
         </div>
       )}
 
-      {/* Footer */}
-      <div className="flex items-center justify-between pt-4 border-t border-white/10 text-lg text-white/60">
-        <span>منبع: {post.source}</span>
-        <span>{post.readTime}</span>
-      </div>
+      <SmartFooter post={post} />
     </div>
   </div>
 );
 
-// 4. Template: Social Feed
+// -------------------------------------------------------------
+// TEMPLATE 4: Social Feed
+// -------------------------------------------------------------
 const SocialFeedTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ post, titleClass }) => (
   <div className="relative z-10 w-full h-full flex flex-col justify-between p-12 text-white">
-    {/* Instagram-like Top Badge */}
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-3 bg-black/60 backdrop-blur-md px-5 py-2.5 rounded-2xl border border-white/15">
-        <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-white text-xl" style={{ backgroundColor: post.primaryColor || '#8b5cf6' }}>
-          {post.category ? post.category[0] : 'خ'}
+    <SmartHeader 
+      post={post}
+      customBadge={
+        <div className="flex items-center gap-3 bg-black/60 backdrop-blur-md px-5 py-2 rounded-2xl border border-white/15">
+          <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-white text-lg" style={{ backgroundColor: post.primaryColor || '#8b5cf6' }}>
+            {post.category ? post.category[0] : 'خ'}
+          </div>
+          <div>
+            <div className="font-bold text-lg">{post.category || 'خبر فوری'}</div>
+          </div>
         </div>
-        <div>
-          <div className="font-bold text-xl">{post.category || 'خبر فوری'}</div>
-          <div className="text-sm text-white/60">{post.date}</div>
-        </div>
-      </div>
-      <div className="px-4 py-2 rounded-xl bg-black/60 backdrop-blur-md border border-white/10 text-lg font-mono">
-        صفحه ۱ از ۱
-      </div>
-    </div>
+      }
+    />
 
     {/* Content Card */}
-    <div className="my-auto space-y-6 bg-gradient-to-t from-black/95 via-black/80 to-black/40 p-8 rounded-3xl border border-white/10 backdrop-blur-md">
+    <div className="my-auto space-y-6 bg-gradient-to-t from-black/95 via-black/85 to-black/50 p-8 rounded-3xl border border-white/10 backdrop-blur-md">
       {post.kicker && (
         <span 
           className="inline-block px-3.5 py-1 rounded-lg text-xl font-bold"
@@ -477,51 +605,50 @@ const SocialFeedTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ 
         <Bookmark className="w-6 h-6 text-yellow-400" />
         <span>برای بعد ذخیره کنید</span>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-3">
+        {post.showAgencyLogo !== false && post.agencyLogo && (
+          <AgencyBrandBadge post={post} forceCompact />
+        )}
         <span>{post.source}</span>
       </div>
     </div>
   </div>
 );
 
-// 5. Template: Broadcast TV
+// -------------------------------------------------------------
+// TEMPLATE 5: Broadcast TV
+// -------------------------------------------------------------
 const BroadcastTvTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ post, titleClass }) => (
   <div className="relative z-10 w-full h-full flex flex-col justify-between p-10 text-white">
-    {/* Channel & Live Indicator */}
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2 px-4 py-2 rounded bg-red-600 font-black text-xl tracking-wider uppercase animate-pulse">
+    <SmartHeader 
+      post={post}
+      customBadge={
+        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 font-black text-xl tracking-wider uppercase shadow animate-pulse">
           <Radio className="w-5 h-5" />
           <span>پخش زنده</span>
         </div>
-        <div className="px-4 py-2 rounded bg-black/70 backdrop-blur text-xl font-bold border border-white/20">
-          استودیو خبر
-        </div>
-      </div>
-      <div className="text-xl bg-black/70 px-4 py-2 rounded font-mono border border-white/20">
-        {post.date}
-      </div>
-    </div>
+      }
+    />
 
     {/* Bottom Lower Third Broadcast Strip */}
-    <div className="space-y-4">
+    <div className="space-y-4 mt-auto">
       <div 
-        className="inline-block px-6 py-2 text-2xl font-black rounded-t-lg shadow-lg"
+        className="inline-block px-6 py-2 text-2xl font-black rounded-t-xl shadow-lg"
         style={{ backgroundColor: post.primaryColor || '#2563eb' }}
       >
-        {post.kicker || post.category}
+        {post.kicker || post.category || 'خبر فوری'}
       </div>
 
-      <div className="p-8 bg-neutral-950/90 backdrop-blur-xl border-t-4 border-red-600 shadow-2xl rounded-b-2xl space-y-4">
+      <div className="p-8 bg-neutral-950/95 backdrop-blur-xl border-t-4 border-red-600 shadow-2xl rounded-b-3xl space-y-4">
         <h1 className={`font-black text-white leading-tight ${titleClass}`}>
           {post.title}
         </h1>
-        <p className="text-2xl text-neutral-300 leading-normal">
+        <p className="text-2xl text-neutral-300 leading-normal font-light">
           {post.lead}
         </p>
 
         {/* Ticker Bar */}
-        <div className="flex items-center gap-4 bg-neutral-900 px-4 py-2.5 rounded text-lg text-white/80 border border-white/10">
+        <div className="flex items-center gap-4 bg-neutral-900 px-4 py-2.5 rounded-xl text-lg text-white/80 border border-white/10">
           <span className="font-bold text-red-400 shrink-0">آخرین سرخط:</span>
           <span className="truncate">{post.keyPoints?.[0] || post.title}</span>
         </div>
@@ -530,21 +657,24 @@ const BroadcastTvTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({
   </div>
 );
 
-// 6. Template: Quote & Statement
-const QuoteStatementTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ post, titleClass }) => (
-  <div className="relative z-10 w-full h-full flex flex-col justify-between p-14 bg-neutral-950/80 text-white">
-    {/* Top Category */}
-    <div className="flex items-center justify-between border-b border-white/15 pb-6">
-      <span className="text-2xl font-bold tracking-wider" style={{ color: post.primaryColor || '#f59e0b' }}>
-        بیانیه و اظهارات رسمی
-      </span>
-      <span className="text-xl text-white/60">{post.date}</span>
-    </div>
+// -------------------------------------------------------------
+// TEMPLATE 6: Quote & Statement
+// -------------------------------------------------------------
+const QuoteStatementTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ post }) => (
+  <div className="relative z-10 w-full h-full flex flex-col justify-between p-14 bg-neutral-950/85 text-white">
+    <SmartHeader 
+      post={post}
+      customBadge={
+        <span className="text-2xl font-bold tracking-wider" style={{ color: post.primaryColor || '#f59e0b' }}>
+          بیانیه و اظهارات رسمی
+        </span>
+      }
+    />
 
     {/* Center Quote Box */}
-    <div className="my-auto space-y-8 p-10 rounded-3xl bg-black/60 border border-white/15 backdrop-blur-lg">
+    <div className="my-auto space-y-8 p-10 rounded-3xl bg-black/65 border border-white/15 backdrop-blur-lg shadow-2xl">
       <Quote 
-        className="w-20 h-20 opacity-40 rotate-180" 
+        className="w-18 h-18 opacity-40 rotate-180" 
         style={{ color: post.primaryColor || '#f59e0b' }} 
       />
       
@@ -567,28 +697,28 @@ const QuoteStatementTemplate: React.FC<{ post: NewsPost; titleClass: string }> =
       </div>
     </div>
 
-    {/* Footer Headline context */}
-    <div className="text-2xl text-white/80 font-light pt-4 flex items-center justify-between">
-      <span>موضوع: {post.title}</span>
-      <span className="text-lg text-white/50">{post.readTime}</span>
-    </div>
+    <SmartFooter post={post} extraText={`موضوع: ${post.title.slice(0, 30)}...`} />
   </div>
 );
 
-// 7. Template: Split Photo
+// -------------------------------------------------------------
+// TEMPLATE 7: Split Photo
+// -------------------------------------------------------------
 const SplitPhotoTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ post, titleClass }) => (
   <div className="relative z-10 w-full h-full flex flex-col justify-between p-10">
-    <div className="p-8 rounded-3xl bg-neutral-950/90 backdrop-blur-xl border border-white/15 shadow-2xl space-y-6 my-auto">
-      <div className="flex items-center justify-between">
+    <SmartHeader 
+      post={post}
+      customBadge={
         <span 
-          className="px-4 py-1.5 rounded-lg text-xl font-black text-white"
+          className="px-4 py-1.5 rounded-xl text-xl font-black text-white shadow"
           style={{ backgroundColor: post.primaryColor || '#10b981' }}
         >
-          {post.category}
+          {post.category || 'گزارش مصور'}
         </span>
-        <span className="text-lg text-white/60">{post.date}</span>
-      </div>
+      }
+    />
 
+    <div className="p-8 rounded-3xl bg-neutral-950/90 backdrop-blur-xl border border-white/15 shadow-2xl space-y-6 mt-auto">
       <h1 className={`font-black text-white ${titleClass}`}>
         {post.title}
       </h1>
@@ -601,35 +731,34 @@ const SplitPhotoTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ 
         <div className="p-4 bg-white/5 rounded-2xl border border-white/10 space-y-2">
           {post.keyPoints.slice(0, 2).map((item, idx) => (
             <div key={idx} className="text-xl text-white/90 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0" />
               <span>{item}</span>
             </div>
           ))}
         </div>
       )}
 
-      <div className="flex items-center justify-between pt-4 border-t border-white/10 text-lg text-white/60">
-        <span>منبع: {post.source}</span>
-        <span>{post.readTime}</span>
-      </div>
+      <SmartFooter post={post} />
     </div>
   </div>
 );
 
-// 8. Template: Headline Hero Focus
-const HeadlineHeroTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ post }) => (
+// -------------------------------------------------------------
+// TEMPLATE 8: Headline Hero Focus
+// -------------------------------------------------------------
+const HeadlineHeroTemplate: React.FC<{ post: NewsPost }> = ({ post }) => (
   <div className="relative z-10 w-full h-full flex flex-col justify-between p-12 bg-gradient-to-t from-black via-black/80 to-transparent text-white">
-    <div className="flex items-center justify-between">
-      <span 
-        className="px-5 py-2 rounded-xl text-2xl font-black text-white shadow-xl"
-        style={{ backgroundColor: post.primaryColor || '#f43f5e' }}
-      >
-        {post.category || 'خبر مهم'}
-      </span>
-      <span className="text-xl text-white/80 bg-black/50 px-4 py-1.5 rounded-lg backdrop-blur">
-        {post.date}
-      </span>
-    </div>
+    <SmartHeader 
+      post={post}
+      customBadge={
+        <span 
+          className="px-5 py-2 rounded-xl text-2xl font-black text-white shadow-xl"
+          style={{ backgroundColor: post.primaryColor || '#f43f5e' }}
+        >
+          {post.category || 'خبر مهم'}
+        </span>
+      }
+    />
 
     <div className="my-auto space-y-8">
       {post.kicker && (
@@ -645,28 +774,29 @@ const HeadlineHeroTemplate: React.FC<{ post: NewsPost; titleClass: string }> = (
       </p>
     </div>
 
-    <div className="flex items-center justify-between pt-6 border-t border-white/20 text-2xl text-white/80">
-      <span>منبع: {post.source}</span>
-      <span>{post.readTime}</span>
-    </div>
+    <SmartFooter post={post} />
   </div>
 );
 
-// 9. Template: Key Takeaways Infographic
+// -------------------------------------------------------------
+// TEMPLATE 9: Key Takeaways Infographic
+// -------------------------------------------------------------
 const KeyTakeawaysTemplate: React.FC<{ post: NewsPost; titleClass: string }> = ({ post, titleClass }) => (
   <div className="relative z-10 w-full h-full flex flex-col justify-between p-12 bg-neutral-950/90 text-white">
-    <div className="flex items-center justify-between pb-4 border-b border-white/15">
-      <div className="flex items-center gap-3">
-        <span 
-          className="px-4 py-2 rounded-lg text-xl font-bold text-white"
-          style={{ backgroundColor: post.primaryColor || '#14b8a6' }}
-        >
-          ۳ نکته کلیدی
-        </span>
-        <span className="text-xl text-white/70">{post.category}</span>
-      </div>
-      <span className="text-lg text-white/60">{post.date}</span>
-    </div>
+    <SmartHeader 
+      post={post}
+      customBadge={
+        <div className="flex items-center gap-3">
+          <span 
+            className="px-4 py-2 rounded-xl text-xl font-bold text-white shadow"
+            style={{ backgroundColor: post.primaryColor || '#14b8a6' }}
+          >
+            ۳ نکته کلیدی
+          </span>
+          <span className="text-xl text-white/70">{post.category}</span>
+        </div>
+      }
+    />
 
     <div className="space-y-4 my-2">
       <h1 className={`font-black text-white ${titleClass}`}>
@@ -699,9 +829,7 @@ const KeyTakeawaysTemplate: React.FC<{ post: NewsPost; titleClass: string }> = (
       )}
     </div>
 
-    <div className="flex items-center justify-between pt-4 border-t border-white/15 text-lg text-white/60">
-      <span>منبع: {post.source}</span>
-      <span>{post.readTime}</span>
-    </div>
+    <SmartFooter post={post} />
   </div>
 );
+

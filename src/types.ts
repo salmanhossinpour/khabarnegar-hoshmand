@@ -15,9 +15,9 @@ export type FontFamilyType = 'vazir' | 'lalezar' | 'rubik' | 'naskh' | 'system';
 
 export type BadgeStyleType = 'solid' | 'pill' | 'outline' | 'tag';
 
-export type LogoPositionType = 'top-right' | 'top-left' | 'top-center' | 'bottom-right' | 'bottom-left';
+export type LogoPositionType = 'top-left' | 'top-right' | 'top-center' | 'header-bar' | 'bottom-left' | 'bottom-right';
 export type LogoBadgeShapeType = 'circle' | 'square' | 'transparent' | 'pill';
-export type LogoSizeType = 'sm' | 'md' | 'lg';
+export type LogoSizeType = 'sm' | 'md' | 'lg' | 'xl';
 
 export interface AgencyBrand {
   _id?: string;
