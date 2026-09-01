@@ -1,101 +1,15 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import { createServer as createViteServer } from "vite";
-import Datastore from "@seald-io/nedb";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-// Ensure data directory exists for NeDB
-const dataDir = path.join(process.cwd(), "data");
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
-
-// Initialize NeDB Datastores (always using NeDB per user instruction)
-const newsDb = new Datastore({
-  filename: path.join(dataDir, "news_posts.db"),
-  autoload: true,
-});
-
-const agencyDb = new Datastore({
-  filename: path.join(dataDir, "agency_brands.db"),
-  autoload: true,
-});
-
-const aiSettingsDb = new Datastore({
-  filename: path.join(dataDir, "ai_settings.db"),
-  autoload: true,
-});
-
-// Seed default agency brands if empty
-async function seedDefaultAgenciesIfEmpty() {
-  try {
-    const count = await agencyDb.countAsync({});
-    if (count === 0) {
-      const defaultAgencies = [
-        {
-          id: "agency_khabar_online",
-          name: "خبرگزاری آنلاین",
-          logoUrl: "https://images.unsplash.com/photo-1585829365295-ab7cd400c167?auto=format&fit=crop&w=200&h=200&q=80",
-          watermarkText: "@KhabarOnline_Fa",
-          sourceName: "خبرگزاری خبرآنلاین",
-          badgeShape: "circle",
-          logoPosition: "top-left",
-          logoSize: "md",
-          showAgencyName: true,
-          brandColor: "#ef4444",
-          isDefault: true,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        },
-        {
-          id: "agency_tech_mag",
-          name: "مجله فناوری و تکنولوژی",
-          logoUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=200&h=200&q=80",
-          watermarkText: "@TechNews_Daily",
-          sourceName: "پایگاه خبری فناوری",
-          badgeShape: "pill",
-          logoPosition: "top-right",
-          logoSize: "md",
-          showAgencyName: true,
-          brandColor: "#3b82f6",
-          isDefault: false,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        },
-        {
-          id: "agency_economy_watch",
-          name: "دیدبان بازار و اقتصاد",
-          logoUrl: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=200&h=200&q=80",
-          watermarkText: "@EcoWatch_Channel",
-          sourceName: "شبکه اخبار اقتصادی",
-          badgeShape: "square",
-          logoPosition: "top-left",
-          logoSize: "md",
-          showAgencyName: true,
-          brandColor: "#10b981",
-          isDefault: false,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        }
-      ];
-      for (const item of defaultAgencies) {
-        await agencyDb.insertAsync(item);
-      }
-      console.log("Seeded initial agency brands to NeDB");
-    }
-  } catch (err) {
-    console.error("Agency seeding error:", err);
-  }
-}
-seedDefaultAgenciesIfEmpty();
-
-// Initialize Gemini Client
+// Initialize Gemini Client with lazy/fallback check
+const geminiApiKey = process.env.GEMINI_API_KEY || "";
 const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || "",
+  apiKey: geminiApiKey,
   httpOptions: {
     headers: {
       "User-Agent": "aistudio-build",
@@ -112,151 +26,7 @@ async function startServer() {
 
   // Health check endpoint
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", database: "NeDB", timestamp: Date.now() });
-  });
-
-  // NeDB: Get all saved news posts
-  app.get("/api/news", async (_req, res) => {
-    try {
-      const posts = await newsDb
-        .findAsync({})
-        .sort({ updatedAt: -1, createdAt: -1 });
-      res.json({ success: true, data: posts });
-    } catch (err: any) {
-      console.error("NeDB find error:", err);
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // NeDB: Get single news post
-  app.get("/api/news/:id", async (req, res) => {
-    try {
-      const post = await newsDb.findOneAsync({ id: req.params.id });
-      if (!post) {
-        return res.status(404).json({ success: false, error: "Post not found" });
-      }
-      res.json({ success: true, data: post });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // NeDB: Save new post
-  app.post("/api/news", async (req, res) => {
-    try {
-      const postData = req.body;
-      if (!postData.id) {
-        postData.id = "news_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7);
-      }
-      postData.createdAt = postData.createdAt || Date.now();
-      postData.updatedAt = Date.now();
-
-      // Check if already exists, update or insert
-      const existing = await newsDb.findOneAsync({ id: postData.id });
-      let saved;
-      if (existing) {
-        await newsDb.updateAsync({ id: postData.id }, { $set: postData });
-        saved = await newsDb.findOneAsync({ id: postData.id });
-      } else {
-        saved = await newsDb.insertAsync(postData);
-      }
-
-      res.json({ success: true, data: saved });
-    } catch (err: any) {
-      console.error("NeDB save error:", err);
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // NeDB: Update existing post
-  app.put("/api/news/:id", async (req, res) => {
-    try {
-      const updateData = { ...req.body, updatedAt: Date.now() };
-      await newsDb.updateAsync({ id: req.params.id }, { $set: updateData });
-      const updated = await newsDb.findOneAsync({ id: req.params.id });
-      res.json({ success: true, data: updated });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // NeDB: Delete post
-  app.delete("/api/news/:id", async (req, res) => {
-    try {
-      await newsDb.removeAsync({ id: req.params.id }, {});
-      res.json({ success: true, message: "Deleted successfully" });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // NeDB: Get all Agency Brands & Logos
-  app.get("/api/agencies", async (_req, res) => {
-    try {
-      const agencies = await agencyDb
-        .findAsync({})
-        .sort({ isDefault: -1, updatedAt: -1, createdAt: -1 });
-      res.json({ success: true, data: agencies });
-    } catch (err: any) {
-      console.error("NeDB agency find error:", err);
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // NeDB: Save or create Agency Brand & Logo
-  app.post("/api/agencies", async (req, res) => {
-    try {
-      const agencyData = req.body;
-      if (!agencyData.id) {
-        agencyData.id = "agency_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6);
-      }
-      agencyData.createdAt = agencyData.createdAt || Date.now();
-      agencyData.updatedAt = Date.now();
-
-      // If user marks this as default, unset others
-      if (agencyData.isDefault) {
-        await agencyDb.updateAsync({}, { $set: { isDefault: false } }, { multi: true });
-      }
-
-      const existing = await agencyDb.findOneAsync({ id: agencyData.id });
-      let saved;
-      if (existing) {
-        await agencyDb.updateAsync({ id: agencyData.id }, { $set: agencyData });
-        saved = await agencyDb.findOneAsync({ id: agencyData.id });
-      } else {
-        saved = await agencyDb.insertAsync(agencyData);
-      }
-
-      res.json({ success: true, data: saved });
-    } catch (err: any) {
-      console.error("NeDB agency save error:", err);
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // NeDB: Update Agency Brand
-  app.put("/api/agencies/:id", async (req, res) => {
-    try {
-      const updateData = { ...req.body, updatedAt: Date.now() };
-      if (updateData.isDefault) {
-        await agencyDb.updateAsync({}, { $set: { isDefault: false } }, { multi: true });
-      }
-      await agencyDb.updateAsync({ id: req.params.id }, { $set: updateData });
-      const updated = await agencyDb.findOneAsync({ id: req.params.id });
-      res.json({ success: true, data: updated });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  // NeDB: Delete Agency Brand
-  app.delete("/api/agencies/:id", async (req, res) => {
-    try {
-      await agencyDb.removeAsync({ id: req.params.id }, {});
-      res.json({ success: true, message: "Agency deleted successfully" });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
+    res.json({ status: "ok", storage: "LocalStorage Client", timestamp: Date.now() });
   });
 
   // CORS-Safe Image Proxy for Canvas Export
@@ -267,7 +37,7 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "URL parameter is required" });
       }
 
-      // If it's already a data URL, return it as is or bad request
+      // If it's already a data URL, return it as is
       if (targetUrl.startsWith("data:")) {
         return res.redirect(targetUrl);
       }
@@ -293,48 +63,6 @@ async function startServer() {
     } catch (err: any) {
       console.error("Proxy image error:", err);
       res.status(500).json({ success: false, error: err.message || "Failed to proxy image" });
-    }
-  });
-
-  // NeDB: Get / Save AI Configuration & API Keys
-  app.get("/api/ai/settings", async (_req, res) => {
-    try {
-      const settings = await aiSettingsDb.findOneAsync({ id: "global_ai_config" });
-      res.json({
-        success: true,
-        data: settings || {
-          provider: "gemini",
-          mistralModel: "mistral-large-latest",
-          openrouterModel: "meta-llama/llama-3.3-70b-instruct",
-          hasMistralKey: !!process.env.MISTRAL_API_KEY,
-          hasOpenRouterKey: !!process.env.OPENROUTER_API_KEY,
-        },
-      });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
-    }
-  });
-
-  app.post("/api/ai/settings", async (req, res) => {
-    try {
-      const config = req.body;
-      const dataToSave = {
-        id: "global_ai_config",
-        provider: config.provider || "gemini",
-        mistralModel: config.mistralModel || "mistral-large-latest",
-        openrouterModel: config.openrouterModel || "meta-llama/llama-3.3-70b-instruct",
-        mistralApiKey: config.mistralApiKey || "",
-        openrouterApiKey: config.openrouterApiKey || "",
-        updatedAt: Date.now(),
-      };
-      await aiSettingsDb.updateAsync(
-        { id: "global_ai_config" },
-        { $set: dataToSave },
-        { upsert: true }
-      );
-      res.json({ success: true, message: "تنظیمات هوش مصنوعی در دیتابیس NeDB ذخیره شد." });
-    } catch (err: any) {
-      res.status(500).json({ success: false, error: err.message });
     }
   });
 
@@ -377,17 +105,14 @@ async function startServer() {
   function extractJson(text: string) {
     if (!text) return null;
     try {
-      // Direct parse
       return JSON.parse(text);
     } catch {
-      // Try strip markdown ```json ... ```
       const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
       if (match && match[1]) {
         try {
           return JSON.parse(match[1].trim());
         } catch {}
       }
-      // Try finding first { and last }
       const firstBrace = text.indexOf("{");
       const lastBrace = text.lastIndexOf("}");
       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
@@ -432,11 +157,10 @@ async function startServer() {
           console.warn(`[Gemini] Model ${currentModel} attempt ${attempt} warning:`, errMsg);
 
           if (isHighDemand && attempt < 2) {
-            // Short backoff before trying next attempt
             await new Promise((r) => setTimeout(r, 1000));
             continue;
           }
-          break; // Try next fallback model
+          break;
         }
       }
     }
@@ -461,9 +185,6 @@ async function startServer() {
       if (!rawText || !rawText.trim()) {
         return res.status(400).json({ success: false, error: "متن اولیه خبر الزامی است." });
       }
-
-      // Check saved settings in NeDB if keys/models not provided in request
-      const savedConfig = await aiSettingsDb.findOneAsync({ id: "global_ai_config" });
 
       const toneDescription = 
         tone === 'breaking' ? 'فوری، مهیج، حساس و پوشش زنده لحظه‌ای' :
@@ -519,14 +240,14 @@ ${rawText}
 
       // 1. Mistral API Provider
       if (provider === "mistral") {
-        const mistralKey = apiKey || savedConfig?.mistralApiKey || process.env.MISTRAL_API_KEY;
+        const mistralKey = apiKey || process.env.MISTRAL_API_KEY;
         if (!mistralKey) {
           return res.status(400).json({
             success: false,
-            error: "کلید API میسترال (Mistral API Key) یافت نشد. لطفاً در بخش تنظیمات یا فیلد ورودی کلید خود را وارد کنید یا از موتور گوگل جمینای استفاده نمایید.",
+            error: "کلید API میسترال (Mistral API Key) یافت نشد. لطفاً در فیلد ورودی کلید خود را وارد کنید یا از موتور گوگل جمینای استفاده نمایید.",
           });
         }
-        const mistralModel = model || savedConfig?.mistralModel || "mistral-large-latest";
+        const mistralModel = model || "mistral-large-latest";
 
         try {
           const mistralResponse = await fetch("https://api.mistral.ai/v1/chat/completions", {
@@ -553,7 +274,6 @@ ${rawText}
           } else {
             const errText = await mistralResponse.text();
             console.warn(`[Mistral] Error ${mistralResponse.status}:`, errText);
-            // Fallback to Gemini
             fallbackNotice = "به دلیل بروز محدودیت در سرور میسترال، خروجی به‌صورت خودکار با موتور جمینای تولید شد.";
           }
         } catch (mErr: any) {
@@ -564,14 +284,14 @@ ${rawText}
       
       // 2. OpenRouter API Provider
       else if (provider === "openrouter") {
-        const openrouterKey = apiKey || savedConfig?.openrouterApiKey || process.env.OPENROUTER_API_KEY;
+        const openrouterKey = apiKey || process.env.OPENROUTER_API_KEY;
         if (!openrouterKey) {
           return res.status(400).json({
             success: false,
             error: "کلید API اوپن‌روتر (OpenRouter API Key) یافت نشد. لطفاً در فیلد مربوطه وارد نمایید یا از موتور پیش‌فرض جمینای استفاده فرمایید.",
           });
         }
-        const openrouterModel = model || savedConfig?.openrouterModel || "meta-llama/llama-3.3-70b-instruct";
+        const openrouterModel = model || "meta-llama/llama-3.3-70b-instruct";
 
         try {
           const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -604,7 +324,6 @@ ${rawText}
             const errMsg = parsedErr?.error?.message || errBodyText;
             console.warn(`[OpenRouter] Status ${orResponse.status} for model ${openrouterModel}:`, errMsg);
 
-            // Auto-fallback to Gemini when OpenRouter is rate-limited (429) or fails
             fallbackNotice = `به دلیل محدودیت ظرفیت مدل OpenRouter (${openrouterModel})، خبر به‌صورت خودکار با موتور گوگل جمینای با موفقیت پردازش شد.`;
           }
         } catch (orErr: any) {
@@ -694,7 +413,7 @@ ${rawText}
     }
   });
 
-  // AI Headline Variations / Tone Rewrite (Supports multi-provider)
+  // AI Headline Variations / Tone Rewrite
   app.post("/api/news/ai-rewrite", async (req, res) => {
     try {
       const { title, lead, type = "headlines", provider = "gemini", model, apiKey } = req.body;
@@ -751,7 +470,6 @@ ${rawText}
       res.status(500).json({ success: false, error: msg });
     }
   });
-
 
   // Vite middleware setup
   if (process.env.NODE_ENV !== "production") {

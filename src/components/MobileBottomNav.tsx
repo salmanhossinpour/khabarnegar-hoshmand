@@ -61,7 +61,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
     },
     {
       id: 'archive' as TabType,
-      label: 'آرشیو NeDB',
+      label: 'آرشیو اخبار',
       icon: FolderArchive,
       color: 'text-violet-400',
       activeBg: 'bg-violet-500/20 text-violet-400 border-violet-500/40',

@@ -10,22 +10,21 @@ import {
   ListChecks, 
   Zap, 
   AlertCircle,
-  Clock,
   Key,
   Cpu,
   ShieldCheck,
   Copy,
   CheckCheck,
-  ChevronDown,
   Eye,
   EyeOff,
   Save,
   FileText,
-  Radio,
-  Sliders
+  Sliders,
+  HardDrive
 } from 'lucide-react';
 import { NewsPost, AspectRatioType, AIProviderType } from '../types';
 import { cleanText, cleanAiPayload } from '../utils/textCleaner';
+import { getStoredAiConfig, saveStoredAiConfig } from '../utils/storage';
 
 interface AIDrawerProps {
   currentPost: NewsPost;
@@ -52,7 +51,7 @@ const OPENROUTER_QUICK_MODELS = [
 ];
 
 export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, onClose }) => {
-  // Provider settings
+  // Provider settings loaded from LocalStorage
   const [provider, setProvider] = useState<AIProviderType>('gemini');
   const [mistralModel, setMistralModel] = useState('mistral-large-latest');
   const [openrouterModel, setOpenrouterModel] = useState('meta-llama/llama-3.3-70b-instruct');
@@ -84,47 +83,30 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
   const [generatedArticle, setGeneratedArticle] = useState<string>(currentPost.fullArticle || '');
   const [lastGeneratedPost, setLastGeneratedPost] = useState<Partial<NewsPost> | null>(null);
 
-  // Load saved AI configuration from NeDB on mount
+  // Load saved AI configuration from LocalStorage on mount
   useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const res = await fetch('/api/ai/settings');
-        const json = await res.json();
-        if (json.success && json.data) {
-          if (json.data.provider) setProvider(json.data.provider);
-          if (json.data.mistralModel) setMistralModel(json.data.mistralModel);
-          if (json.data.openrouterModel) setOpenrouterModel(json.data.openrouterModel);
-          if (json.data.mistralApiKey) setMistralApiKey(json.data.mistralApiKey);
-          if (json.data.openrouterApiKey) setOpenrouterApiKey(json.data.openrouterApiKey);
-        }
-      } catch (err) {
-        console.error('Failed to load AI settings from NeDB:', err);
-      }
-    };
-    loadSettings();
+    const config = getStoredAiConfig();
+    if (config) {
+      if (config.provider) setProvider(config.provider);
+      if (config.mistralModel) setMistralModel(config.mistralModel);
+      if (config.openrouterModel) setOpenrouterModel(config.openrouterModel);
+      if (config.mistralApiKey) setMistralApiKey(config.mistralApiKey);
+      if (config.openrouterApiKey) setOpenrouterApiKey(config.openrouterApiKey);
+      if (typeof config.humanize === 'boolean') setHumanize(config.humanize);
+    }
   }, []);
 
-  const handleSaveSettingsToDb = async () => {
-    try {
-      const res = await fetch('/api/ai/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider,
-          mistralModel,
-          openrouterModel,
-          mistralApiKey,
-          openrouterApiKey,
-        }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setSavedInDbStatus('تنظیمات و کلیدها با موفقیت در دیتابیس NeDB ذخیره شد.');
-        setTimeout(() => setSavedInDbStatus(null), 3500);
-      }
-    } catch (e) {
-      console.error(e);
-    }
+  const handleSaveSettings = () => {
+    saveStoredAiConfig({
+      provider,
+      mistralModel,
+      openrouterModel,
+      mistralApiKey,
+      openrouterApiKey,
+      humanize,
+    });
+    setSavedInDbStatus('تنظیمات و کلیدها در حافظه محلی مرورگر (LocalStorage) ذخیره شد.');
+    setTimeout(() => setSavedInDbStatus(null), 3000);
   };
 
   const sampleTexts = [
@@ -152,6 +134,16 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
     setError(null);
     setFallbackNotice(null);
     setHeadlineOptions([]);
+
+    // Auto save settings to localStorage
+    saveStoredAiConfig({
+      provider,
+      mistralModel,
+      openrouterModel,
+      mistralApiKey,
+      openrouterApiKey,
+      humanize,
+    });
 
     try {
       const activeApiKey = provider === 'mistral' ? mistralApiKey : provider === 'openrouter' ? openrouterApiKey : undefined;
@@ -311,7 +303,10 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
           {/* Gemini */}
           <button
             type="button"
-            onClick={() => setProvider('gemini')}
+            onClick={() => {
+              setProvider('gemini');
+              saveStoredAiConfig({ provider: 'gemini' });
+            }}
             className={`p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center gap-1 ${
               provider === 'gemini'
                 ? 'bg-red-500/20 border-red-500 text-white shadow ring-1 ring-red-500/50'
@@ -328,7 +323,10 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
           {/* Mistral */}
           <button
             type="button"
-            onClick={() => setProvider('mistral')}
+            onClick={() => {
+              setProvider('mistral');
+              saveStoredAiConfig({ provider: 'mistral' });
+            }}
             className={`p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center gap-1 ${
               provider === 'mistral'
                 ? 'bg-amber-500/20 border-amber-500 text-amber-300 shadow ring-1 ring-amber-500/50'
@@ -345,7 +343,10 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
           {/* OpenRouter */}
           <button
             type="button"
-            onClick={() => setProvider('openrouter')}
+            onClick={() => {
+              setProvider('openrouter');
+              saveStoredAiConfig({ provider: 'openrouter' });
+            }}
             className={`p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center gap-1 ${
               provider === 'openrouter'
                 ? 'bg-blue-500/20 border-blue-500 text-blue-300 shadow ring-1 ring-blue-500/50'
@@ -368,7 +369,10 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
               <label className="text-xs font-semibold text-neutral-300">انتخاب مدل میسترال (Mistral Model):</label>
               <select
                 value={mistralModel}
-                onChange={(e) => setMistralModel(e.target.value)}
+                onChange={(e) => {
+                  setMistralModel(e.target.value);
+                  saveStoredAiConfig({ mistralModel: e.target.value });
+                }}
                 className="w-full p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 focus:border-amber-500 text-xs text-neutral-100 font-sans"
               >
                 {MISTRAL_MODELS.map((m) => (
@@ -384,7 +388,7 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
               <div className="flex items-center justify-between">
                 <label className="text-xs font-semibold text-neutral-300 flex items-center gap-1">
                   <Key className="w-3.5 h-3.5 text-amber-400" />
-                  <span>کلید اختصاصی Mistral API Key (اختیاری):</span>
+                  <span>کلید اختصاصی Mistral API Key:</span>
                 </label>
                 <button
                   type="button"
@@ -400,17 +404,17 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
                   type={showKeyMistral ? 'text' : 'password'}
                   value={mistralApiKey}
                   onChange={(e) => setMistralApiKey(e.target.value)}
-                  placeholder="کلید API میسترال خود را وارد کنید (یا از کلید سرور استفاده می‌شود)"
+                  placeholder="کلید API میسترال خود را وارد کنید"
                   className="flex-1 p-2 rounded-xl bg-neutral-950 border border-neutral-800 focus:border-amber-500 text-xs text-neutral-100 font-mono"
                 />
                 <button
                   type="button"
-                  onClick={handleSaveSettingsToDb}
+                  onClick={handleSaveSettings}
                   className="px-3 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs text-neutral-200 flex items-center gap-1 shrink-0 transition-colors"
-                  title="ذخیره تنظیمات در دیتابیس NeDB"
+                  title="ذخیره تنظیمات در حافظه مرورگر"
                 >
                   <Save className="w-3.5 h-3.5 text-amber-400" />
-                  <span>ذخیره NeDB</span>
+                  <span>ذخیره محلی</span>
                 </button>
               </div>
             </div>
@@ -429,7 +433,10 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
               <input
                 type="text"
                 value={openrouterModel}
-                onChange={(e) => setOpenrouterModel(e.target.value)}
+                onChange={(e) => {
+                  setOpenrouterModel(e.target.value);
+                  saveStoredAiConfig({ openrouterModel: e.target.value });
+                }}
                 placeholder="مثلاً: meta-llama/llama-3.3-70b-instruct یا anthropic/claude-3.5-sonnet"
                 className="w-full p-2.5 rounded-xl bg-neutral-950 border border-neutral-800 focus:border-blue-500 text-xs text-neutral-100 font-mono text-left"
                 dir="ltr"
@@ -444,7 +451,10 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
                   <button
                     key={m.id}
                     type="button"
-                    onClick={() => setOpenrouterModel(m.id)}
+                    onClick={() => {
+                      setOpenrouterModel(m.id);
+                      saveStoredAiConfig({ openrouterModel: m.id });
+                    }}
                     className={`text-[10px] px-2.5 py-1 rounded-lg border transition-all ${
                       openrouterModel === m.id
                         ? 'bg-blue-500/20 border-blue-500 text-blue-300'
@@ -483,12 +493,12 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
                 />
                 <button
                   type="button"
-                  onClick={handleSaveSettingsToDb}
+                  onClick={handleSaveSettings}
                   className="px-3 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-xs text-neutral-200 flex items-center gap-1 shrink-0 transition-colors"
-                  title="ذخیره تنظیمات در دیتابیس NeDB"
+                  title="ذخیره تنظیمات در حافظه مرورگر"
                 >
                   <Save className="w-3.5 h-3.5 text-blue-400" />
-                  <span>ذخیره NeDB</span>
+                  <span>ذخیره محلی</span>
                 </button>
               </div>
             </div>
@@ -506,7 +516,11 @@ export const AIDrawer: React.FC<AIDrawerProps> = ({ currentPost, onApplyPost, on
 
       {/* 2. Anti-AI / Humanized Persian Mode Toggle */}
       <div 
-        onClick={() => setHumanize(!humanize)}
+        onClick={() => {
+          const nextVal = !humanize;
+          setHumanize(nextVal);
+          saveStoredAiConfig({ humanize: nextVal });
+        }}
         className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${
           humanize 
             ? 'bg-gradient-to-r from-emerald-950/40 to-neutral-900 border-emerald-500/50 shadow-sm'

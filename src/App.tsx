@@ -12,6 +12,11 @@ import { AgencyLogoManager } from './components/AgencyLogoManager';
 import { ArchiveDrawer } from './components/ArchiveDrawer';
 import { ExportModal } from './components/ExportModal';
 import { 
+  getStoredCurrentPost, 
+  saveStoredCurrentPost, 
+  savePostToStorage 
+} from './utils/storage';
+import { 
   Sparkles, 
   Building2,
   LayoutTemplate, 
@@ -23,17 +28,14 @@ import {
   ZoomIn, 
   ZoomOut, 
   Maximize2,
-  Smartphone,
-  Square,
-  RefreshCw,
-  Database,
-  Share2,
-  HelpCircle,
-  Undo2
+  HardDrive,
+  CheckCircle2
 } from 'lucide-react';
 
 export default function App() {
-  const [post, setPost] = useState<NewsPost>(INITIAL_NEWS_POST);
+  const [post, setPost] = useState<NewsPost>(() => {
+    return getStoredCurrentPost() || INITIAL_NEWS_POST;
+  });
   const [activeTab, setActiveTab] = useState<TabType>(null);
   const [isExportOpen, setIsExportOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -81,31 +83,33 @@ export default function App() {
     return () => window.removeEventListener('resize', updateScale);
   }, [post.aspectRatio]);
 
+  // Auto-save current post to LocalStorage whenever it changes
+  useEffect(() => {
+    saveStoredCurrentPost(post);
+  }, [post]);
+
   const currentScale = zoomManual ?? autoScale;
 
   const handleUpdatePost = (updatedFields: Partial<NewsPost>) => {
-    setPost((prev) => ({
-      ...prev,
-      ...updatedFields,
-      updatedAt: Date.now(),
-    }));
+    setPost((prev) => {
+      const updated = {
+        ...prev,
+        ...updatedFields,
+        updatedAt: Date.now(),
+      };
+      saveStoredCurrentPost(updated);
+      return updated;
+    });
   };
 
-  const handleSaveToNeDB = async () => {
+  const handleSaveToLocalStorage = () => {
     setSaving(true);
     try {
-      const res = await fetch('/api/news', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(post),
-      });
-      const json = await res.json();
-      if (json.success) {
-        setSaveToast('پست با موفقیت در دیتابیس NeDB ذخیره شد!');
-        setTimeout(() => setSaveToast(null), 3000);
-      }
+      savePostToStorage(post);
+      setSaveToast('پست با موفقیت در آرشیو حافظه مرورگر ذخیره شد!');
+      setTimeout(() => setSaveToast(null), 3000);
     } catch (err) {
-      console.error('Error saving post to NeDB:', err);
+      console.error('Error saving post to LocalStorage:', err);
     } finally {
       setSaving(false);
     }
@@ -125,7 +129,7 @@ export default function App() {
               خبرنگار هوشمند
             </h1>
             <p className="text-[10px] text-neutral-400 hidden sm:block">
-              ساخت آسان پست و استوری خبری با هوش مصنوعی و دیتابیس NeDB
+              طراحی پست و استوری خبری با هوش مصنوعی و ذخیره‌سازی پایدار محلی
             </p>
           </div>
         </div>
@@ -160,15 +164,15 @@ export default function App() {
             <span>هوش مصنوعی</span>
           </button>
 
-          {/* Quick Save to NeDB */}
+          {/* Quick Save to LocalStorage */}
           <button
             type="button"
-            onClick={handleSaveToNeDB}
+            onClick={handleSaveToLocalStorage}
             disabled={saving}
-            title="ذخیره در NeDB"
+            title="ذخیره در حافظه محلی مرورگر (LocalStorage)"
             className="p-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-emerald-400 border border-neutral-700 transition-colors"
           >
-            {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            <Save className="w-4 h-4" />
           </button>
 
           {/* Export Button */}
@@ -193,11 +197,11 @@ export default function App() {
 
           {[
             { id: 'ai' as TabType, label: 'تولید با هوش مصنوعی', icon: Sparkles, color: 'text-red-400', desc: 'تبدیل متن ساده به خبر آماده' },
-            { id: 'agency' as TabType, label: 'لوگو و برند خبرگزاری', icon: Building2, color: 'text-rose-400', desc: 'ثبت، سوییچ و ذخیره لوگو در NeDB' },
+            { id: 'agency' as TabType, label: 'لوگو و برند خبرگزاری', icon: Building2, color: 'text-rose-400', desc: 'ثبت، سوییچ و ذخیره لوگو در حافظه' },
             { id: 'templates' as TabType, label: 'قالب‌ها و استایل‌ها', icon: LayoutTemplate, color: 'text-amber-400', desc: 'انتخاب از ۹ قالب مینیمال' },
             { id: 'content' as TabType, label: 'ویرایش متن و تیتر', icon: Edit3, color: 'text-blue-400', desc: 'تیتر، لید، روتیتر و نکات' },
             { id: 'media' as TabType, label: 'عکس از سیستم کاربر', icon: ImageIcon, color: 'text-emerald-400', desc: 'بارگذاری عکس و تنظیم بلر' },
-            { id: 'archive' as TabType, label: 'آرشیو دیتابیس NeDB', icon: FolderArchive, color: 'text-violet-400', desc: 'مشاهده و لود اخبار ذخیره شده' },
+            { id: 'archive' as TabType, label: 'آرشیو پست‌های ذخیره‌شده', icon: FolderArchive, color: 'text-violet-400', desc: 'مشاهده و لود اخبار ذخیره شده' },
           ].map((tool) => {
             const Icon = tool.icon;
             const isActive = activeTab === tool.id;
@@ -226,11 +230,11 @@ export default function App() {
           {/* Quick Info Tip */}
           <div className="mt-auto p-3.5 rounded-2xl bg-neutral-950/70 border border-neutral-800 text-[11px] text-neutral-400 space-y-1.5">
             <div className="flex items-center gap-1.5 text-neutral-300 font-bold">
-              <Database className="w-3.5 h-3.5 text-emerald-400" />
-              <span>پایگاه داده NeDB فعال</span>
+              <HardDrive className="w-3.5 h-3.5 text-emerald-400" />
+              <span>ذخیره‌سازی پایدار محلی (LocalStorage)</span>
             </div>
-            <p className="leading-relaxed">
-              تمام اخبار و تنظیمات به صورت امن در سرور NeDB ذخیره می‌شوند.
+            <p className="leading-relaxed text-[10px]">
+              لوگوها، تنظیمات هوش مصنوعی و آرشیو اخبار به‌صورت مستقیم در حافظه مرورگر شما ذخیره می‌شوند و پایدار می‌مانند.
             </p>
           </div>
         </aside>
@@ -320,7 +324,7 @@ export default function App() {
       <DrawerSheet
         isOpen={activeTab === 'agency'}
         onClose={() => setActiveTab(null)}
-        title="لوگو و برند خبرگزاری (ذخیره دائمی NeDB)"
+        title="لوگو و برند خبرگزاری (ذخیره در حافظه محلی)"
         subtitle="بارگذاری لوگوی اختصاصی، سوییچ بین خبرگزاری‌ها و تنظیمات کادر"
         icon={<Building2 className="w-5 h-5 text-rose-400" />}
       >
@@ -364,19 +368,22 @@ export default function App() {
       <DrawerSheet
         isOpen={activeTab === 'archive'}
         onClose={() => setActiveTab(null)}
-        title="آرشیو اخبار ذخیره‌شده (NeDB)"
-        subtitle="مدیریت و بارگذاری پست‌های ذخیره شده در دیتابیس NeDB"
+        title="آرشیو پست‌های ذخیره‌شده (حافظه محلی)"
+        subtitle="مدیریت و بارگذاری پست‌های ذخیره شده در حافظه مرورگر"
         icon={<FolderArchive className="w-5 h-5 text-violet-400" />}
       >
         <ArchiveDrawer
           currentPost={post}
           onLoadPost={(loadedPost) => {
             setPost(loadedPost);
+            saveStoredCurrentPost(loadedPost);
             setActiveTab(null);
             setSaveToast(`خبر «${loadedPost.title.substring(0, 25)}...» لود شد`);
             setTimeout(() => setSaveToast(null), 2500);
           }}
-          onSaveCurrent={handleSaveToNeDB}
+          onSaveCurrent={async () => {
+            handleSaveToLocalStorage();
+          }}
           saving={saving}
         />
       </DrawerSheet>
@@ -390,7 +397,7 @@ export default function App() {
         onUpdatePost={handleUpdatePost}
       />
 
-      {/* Persistent Mobile Bottom Navigation Bar ("توی گوشی همیشه باتوم بار داشته باشه") */}
+      {/* Persistent Mobile Bottom Navigation Bar */}
       <MobileBottomNav
         activeTab={activeTab}
         onSelectTab={setActiveTab}
@@ -400,7 +407,7 @@ export default function App() {
       {/* Toast Notification */}
       {saveToast && (
         <div className="fixed bottom-24 md:bottom-8 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl bg-neutral-900/95 border border-emerald-500/80 text-emerald-400 text-xs font-bold shadow-2xl flex items-center gap-2 animate-bounce">
-          <Database className="w-4 h-4" />
+          <CheckCircle2 className="w-4 h-4" />
           <span>{saveToast}</span>
         </div>
       )}

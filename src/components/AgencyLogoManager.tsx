@@ -2,6 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { AgencyBrand, NewsPost, LogoBadgeShapeType, LogoPositionType, LogoSizeType } from '../types';
 import { getSafeImageUrl } from '../utils/imageExporter';
 import { 
+  getStoredAgencies, 
+  saveAgencyToStorage, 
+  deleteAgencyFromStorage 
+} from '../utils/storage';
+import { 
   Building2, 
   Upload, 
   Check, 
@@ -11,14 +16,9 @@ import {
   Save, 
   Sliders, 
   Sparkles, 
-  Star, 
-  Tag, 
-  AtSign, 
-  LayoutGrid, 
   Layers, 
-  Image as ImageIcon,
   CheckCircle2,
-  FolderOpen
+  HardDrive
 } from 'lucide-react';
 
 interface AgencyLogoManagerProps {
@@ -33,8 +33,6 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
   onClose,
 }) => {
   const [agencies, setAgencies] = useState<AgencyBrand[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [activeBrandId, setActiveBrandId] = useState<string | null>(null);
   const [isEditingNew, setIsEditingNew] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -53,33 +51,23 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragActive, setDragActive] = useState(false);
 
-  // Load agencies from NeDB backend
-  const fetchAgencies = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/agencies');
-      const json = await res.json();
-      if (json.success && Array.isArray(json.data)) {
-        setAgencies(json.data);
-        // Find if any matches current post
-        const match = json.data.find((a: AgencyBrand) => a.logoUrl === post.agencyLogo || a.name === post.agencyName);
-        if (match) {
-          setActiveBrandId(match.id);
-        } else if (json.data.length > 0 && !post.agencyLogo) {
-          // Select default or first
-          const def = json.data.find((a: AgencyBrand) => a.isDefault) || json.data[0];
-          handleSwitchAgency(def);
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching agencies from NeDB:', err);
-    } finally {
-      setLoading(false);
+  // Load agencies directly from LocalStorage
+  const loadAgencies = () => {
+    const list = getStoredAgencies();
+    setAgencies(list);
+
+    // Find if any matches current post
+    const match = list.find((a: AgencyBrand) => a.logoUrl === post.agencyLogo || a.name === post.agencyName);
+    if (match) {
+      setActiveBrandId(match.id);
+    } else if (list.length > 0 && !post.agencyLogo) {
+      const def = list.find((a: AgencyBrand) => a.isDefault) || list[0];
+      handleSwitchAgency(def);
     }
   };
 
   useEffect(() => {
-    fetchAgencies();
+    loadAgencies();
   }, []);
 
   const handleSwitchAgency = (agency: AgencyBrand) => {
@@ -134,7 +122,7 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
     }
   };
 
-  const handleSaveAgencyToNeDB = async () => {
+  const handleSaveAgencyToLocalStorage = () => {
     if (!formName.trim()) {
       alert('لطفاً نام رسانه یا خبرگزاری را وارد فرمایید.');
       return;
@@ -144,9 +132,8 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
       return;
     }
 
-    setSaving(true);
     try {
-      const newAgency: Partial<AgencyBrand> = {
+      const newAgency = saveAgencyToStorage({
         name: formName.trim(),
         logoUrl: formLogoUrl,
         watermarkText: formWatermark.trim() || `@${formName.replace(/\s+/g, '_')}`,
@@ -156,45 +143,30 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
         logoSize: formSize,
         showAgencyName: formShowName,
         isDefault: formIsDefault,
-      };
-
-      const res = await fetch('/api/agencies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newAgency),
       });
-      const json = await res.json();
-      if (json.success && json.data) {
-        await fetchAgencies();
-        handleSwitchAgency(json.data);
-        setIsEditingNew(false);
-        setSuccessMessage(`برند «${formName}» برای همیشه در دیتابیس NeDB ذخیره شد!`);
-        setTimeout(() => setSuccessMessage(null), 3000);
-      }
+
+      loadAgencies();
+      handleSwitchAgency(newAgency);
+      setIsEditingNew(false);
+      setSuccessMessage(`برند «${formName}» در حافظه محلی مرورگر (LocalStorage) ذخیره شد!`);
+      setTimeout(() => setSuccessMessage(null), 3000);
     } catch (err) {
-      console.error('Error saving agency to NeDB:', err);
-      alert('خطا در ذخیره‌سازی لوگو در دیتابیس NeDB.');
-    } finally {
-      setSaving(false);
+      console.error('Error saving agency to LocalStorage:', err);
+      alert('خطا در ذخیره‌سازی لوگو در حافظه محلی.');
     }
   };
 
-  const handleDeleteAgency = async (id: string, e: React.MouseEvent) => {
+  const handleDeleteAgency = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm('آیا از حذف این لوگوی رسانه از دیتابیس NeDB اطمینان دارید؟')) return;
+    if (!confirm('آیا از حذف این لوگوی رسانه از حافظه مرورگر اطمینان دارید؟')) return;
 
-    try {
-      const res = await fetch(`/api/agencies/${id}`, { method: 'DELETE' });
-      const json = await res.json();
-      if (json.success) {
-        setAgencies((prev) => prev.filter((a) => a.id !== id));
-        if (activeBrandId === id) {
-          setActiveBrandId(null);
-        }
-      }
-    } catch (err) {
-      console.error('Error deleting agency from NeDB:', err);
+    deleteAgencyFromStorage(id);
+    loadAgencies();
+    if (activeBrandId === id) {
+      setActiveBrandId(null);
     }
+    setSuccessMessage('لوگو از حافظه محلی حذف شد.');
+    setTimeout(() => setSuccessMessage(null), 2500);
   };
 
   // Sample Logo Presets for Quick Selection
@@ -223,11 +195,11 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
           </div>
           <div>
             <h4 className="text-xs font-bold text-neutral-100 flex items-center gap-1.5">
-              <span>مدیریت و سوییچ بین لوگوهای خبرگزاری</span>
+              <span>مدیریت لوگوهای خبرگزاری (LocalStorage)</span>
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             </h4>
             <p className="text-[11px] text-neutral-400">
-              لوگوی اختصاصی خود را یک‌بار ثبت و برای همیشه در دیتابیس NeDB ذخیره کنید.
+              لوگوی اختصاصی خود را یک‌بار ثبت و مستقیماً در حافظه مرورگر ذخیره و سوییچ کنید.
             </p>
           </div>
         </div>
@@ -254,7 +226,7 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
           <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
             <span className="text-xs font-bold text-red-400 flex items-center gap-1.5">
               <Sparkles className="w-4 h-4" />
-              <span>ثبت لوگوی جدید رسانه شما (ذخیره دائمی در NeDB)</span>
+              <span>ثبت لوگوی جدید رسانه شما (ذخیره در حافظه مرورگر)</span>
             </span>
           </div>
 
@@ -390,16 +362,11 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
           {/* Save Button */}
           <button
             type="button"
-            onClick={handleSaveAgencyToNeDB}
-            disabled={saving}
-            className="w-full py-3 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-red-950/40 transition-all active:scale-[0.99] disabled:opacity-50"
+            onClick={handleSaveAgencyToLocalStorage}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-red-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-red-950/40 transition-all active:scale-[0.99]"
           >
-            {saving ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <Save className="w-4 h-4" />
-            )}
-            <span>ذخیره دائمی لوگو در دیتابیس NeDB و اعمال روی خبر</span>
+            <Save className="w-4 h-4" />
+            <span>ذخیره در حافظه محلی و اعمال روی خبر</span>
           </button>
         </div>
       )}
@@ -413,21 +380,15 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
           </label>
           <button
             type="button"
-            onClick={fetchAgencies}
-            disabled={loading}
+            onClick={loadAgencies}
             className="text-[11px] text-neutral-400 hover:text-white flex items-center gap-1"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className="w-3.5 h-3.5" />
             <span>بروزرسانی</span>
           </button>
         </div>
 
-        {loading ? (
-          <div className="p-8 text-center text-xs text-neutral-500">
-            <RefreshCw className="w-6 h-6 animate-spin mx-auto text-amber-500 mb-2" />
-            در حال دریافت از دیتابیس NeDB...
-          </div>
-        ) : agencies.length === 0 ? (
+        {agencies.length === 0 ? (
           <div className="p-8 text-center rounded-2xl bg-neutral-900/50 border border-neutral-800 text-xs text-neutral-400 space-y-2">
             <Building2 className="w-8 h-8 mx-auto text-neutral-600" />
             <div>هنوز لوگویی ذخیره نشده است. با دکمه «افزودن لوگوی جدید» اولین لوگوی خود را ثبت کنید!</div>
@@ -483,7 +444,7 @@ export const AgencyLogoManager: React.FC<AgencyLogoManagerProps> = ({
                       type="button"
                       onClick={(e) => handleDeleteAgency(agency.id, e)}
                       className="p-2 text-neutral-500 hover:text-red-400 rounded-lg hover:bg-red-500/10 transition-colors"
-                      title="حذف از دیتابیس NeDB"
+                      title="حذف از حافظه محلی"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>

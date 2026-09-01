@@ -1,6 +1,6 @@
 {
   "name": "خبرنگار هوشمند",
-  "description": "استودیوی خبرنگار هوشمند جهت ساخت پست و استوری خبری با قالب‌های مدرن، هوش مصنوعی، تنظیمات فونت و رنگ، و ذخیره محلی با NeDB",
+  "description": "استودیوی خبرنگار هوشمند جهت ساخت پست و استوری خبری با قالب‌های مدرن، هوش مصنوعی، تنظیمات فونت و رنگ، و ذخیره محلی با LocalStorage",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
